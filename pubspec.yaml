@@ -1,0 +1,83 @@
+name: ssi
+description: A new Flutter project.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.0.3 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  stacked: ^3.4.0
+  stacked_services: ^1.1.0
+  injectable: ^2.3.2
+
+  # UI & Theming
+  cupertino_icons: ^1.0.6
+  flutter_svg: ^2.0.9
+  lottie: ^2.7.0
+  shimmer: ^3.0.0
+  flutter_animate: ^4.3.0
+
+  # Storage & Database
+  shared_preferences: ^2.2.2
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  path_provider: ^2.1.1
+
+  # Security & Encryption
+  flutter_secure_storage: ^9.0.0
+  crypto: ^3.0.3
+
+  # QR Code
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^3.5.5
+
+  # NFC (for credential exchange)
+  nfc_manager: ^4.1.1
+
+  # Biometrics
+  local_auth: ^2.1.7
+
+  # Networking
+  dio: ^5.4.0
+  pretty_dio_logger: ^1.3.1
+
+  # JSON
+  json_annotation: ^4.8.1
+
+  # Utils
+  intl: ^0.18.1
+  logger: ^2.0.2+1
+  uuid: ^4.2.2
+  rxdart: ^0.27.7
+  collection: ^1.18.0
+
+  # Permissions
+  permission_handler: ^11.1.0
+dev_dependencies:
+  build_runner: ^2.4.5
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  mockito: ^5.4.1
+  stacked_generator: ^1.3.3
+  golden_toolkit: ^0.15.0
+
+  # Icons
+  flutter_launcher_icons: ^0.13.1
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/animations/
+    - assets/logos/
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  adaptive_icon_background: "#6366F1"
+  adaptive_icon_foreground: "assets/icons/app_icon_foreground.png"

@@ -49,5 +49,18 @@
 	<string>This app needs access to your camera to scan QR codes for credential issuance and verification</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs access to your photo library to select QR codes</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.example.ssi.eudi-openid4ci</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>eudi-openid4ci</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

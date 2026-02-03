@@ -25,23 +25,14 @@ import Flutter
         open url: URL,
         options: [UIApplication.OpenURLOptionsKey : Any] = [:]
     ) -> Bool {
-        // Handle authorization callback from EUDI issuer
-        if url.scheme == "eudi-openid4ci" && url.host == "authorize" {
-            print("[AppDelegate] Received OpenID4VCI authorization callback: \(url)")
+        // Log URL for debugging, but don't handle authorization callbacks here
+        // In EUDI iOS SDK, authorization callbacks are handled internally by the SDK
+        // via async/await when issueDocumentsByOfferUrl is called
+        // The SDK uses ASWebAuthenticationSession which handles callbacks automatically
+        print("[AppDelegate] Received URL: \(url)")
 
-            let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-            let code = components?.queryItems?.first(where: { $0.name == "code" })?.value
-            let state = components?.queryItems?.first(where: { $0.name == "state" })?.value
-
-            print("[AppDelegate] Authorization code: \(code?.prefix(20) ?? "")...")
-            print("[AppDelegate] State: \(state ?? "")")
-
-            // Notify the EUDI SDK about the authorization response
-            ssiApiImpl?.handleAuthorizationResponse(url: url)
-
-            return true
-        }
-
+        // Let Flutter's app_links handle deep links
+        // Flutter will manage the UI state and call native methods via Pigeon when needed
         return super.application(app, open: url, options: options)
     }
 

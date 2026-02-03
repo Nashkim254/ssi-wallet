@@ -27,28 +27,14 @@ class MainActivity: FlutterFragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
 
-        // Handle authorization callback from EUDI issuer
+        // Log intent for debugging, but don't handle authorization callbacks here
+        // Authorization callbacks should flow through Flutter's app_links/uni_links
+        // so the UI layer can properly manage state and show loading/error feedback
         val data = intent.data
-
         Log.d(TAG, "onNewIntent - action: ${intent.action}, data: $data")
 
-        // Check if this is an authorization callback for OpenID4VCI
-        if (data != null && data.scheme == "eudi-openid4ci" && data.host == "authorize") {
-            Log.d(TAG, "Received OpenID4VCI authorization callback: $data")
-
-            // Extract authorization parameters
-            val code = data.getQueryParameter("code")
-            val state = data.getQueryParameter("state")
-
-            Log.d(TAG, "Authorization code: ${code?.substring(0, minOf(20, code.length ?: 0))}...")
-            Log.d(TAG, "State: $state")
-
-            // NOTE: Flutter now handles authorization callbacks via uni_links
-            // This provides better UI feedback (loading dialogs, error messages)
-            // Commenting out the old handler to prevent duplicate processing
-            // ssiApiImpl?.handleAuthorizationResponse(data.toString())
-            Log.d(TAG, "Deep link will be handled by Flutter layer for better UI feedback")
-        }
+        // Let Flutter's app_links handle all deep links including OAuth callbacks
+        // Flutter will call handleAuthorizationCallback() via Pigeon when needed
     }
 
     override fun onDestroy() {

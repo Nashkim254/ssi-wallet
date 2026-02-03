@@ -32,8 +32,19 @@ target 'Runner' do
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
-  # Note: EUDI Wallet Kit is distributed as Swift Package Manager, not CocoaPods
-  # We'll implement a compatible version manually
+  # EUDI Wallet Kit must be added via Swift Package Manager in Xcode
+  # See: https://github.com/eu-digital-identity-wallet/eudi-lib-ios-wallet-kit
+  #
+  # To add the EUDI SDK:
+  # 1. Open ios/Runner.xcworkspace in Xcode
+  # 2. Select the Runner project
+  # 3. Go to "Package Dependencies" tab
+  # 4. Click "+" to add package
+  # 5. Enter URL: https://github.com/eu-digital-identity-wallet/eudi-lib-ios-wallet-kit.git
+  # 6. Select version: 0.19.4 (or latest compatible version)
+  # 7. Add to Runner target
+  #
+  # Note: The SDK requires iOS 16.0+ (already configured above)
 
   target 'RunnerTests' do
     inherit! :search_paths

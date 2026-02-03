@@ -10,12 +10,16 @@
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
+		54C58F18A7384F3F897F8307 /* SsiApi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E20863366384AF38AC46E83 /* SsiApi.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
+		E06E81691CA343119456178A /* SprucekitSsiApiImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46435FDCC90A41CC8297F98F /* SprucekitSsiApiImpl.swift */; };
 		F4DBF8C2DB522239020B3597 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62704C1D882A21C3B3E1EF86 /* Pods_Runner.framework */; };
 		F536640DE5D3398BF64FA838 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0D8216C2AF1BD33E8FE7FC95 /* Pods_RunnerTests.framework */; };
+		76D12D674824438CA9749200 /* EudiSsiApiImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027409046FED4BAEA19FA1EE /* EudiSsiApiImpl.swift */; };
+		C2EDB33A0C694C0B8BCD629B /* EudiWalletCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BD7EE3BB4F4B63BD11CB13 /* EudiWalletCore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,10 +50,12 @@
 		141332A6C2C1184C6937D752 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
+		1E20863366384AF38AC46E83 /* SsiApi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SsiApi.swift; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
 		3EF2C36D980695953DBBA4DB /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
+		46435FDCC90A41CC8297F98F /* SprucekitSsiApiImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SprucekitSsiApiImpl.swift; sourceTree = "<group>"; };
 		4EE8AA87A367C2718F549D92 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 		53566A60EDA138B9A1D66773 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
 		5AD971EF1A6653FCCFCAA539 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
@@ -65,6 +71,8 @@
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B40E77018B008B89B7DDD690 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
+		027409046FED4BAEA19FA1EE /* EudiSsiApiImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EudiSsiApiImpl.swift; sourceTree = "<group>"; };
+		A0BD7EE3BB4F4B63BD11CB13 /* EudiWalletCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EudiWalletCore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -138,7 +146,11 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
-			);
+				1E20863366384AF38AC46E83 /* SsiApi.swift */,
+				46435FDCC90A41CC8297F98F /* SprucekitSsiApiImpl.swift */,
+			
+				027409046FED4BAEA19FA1EE /* EudiSsiApiImpl.swift */,
+				A0BD7EE3BB4F4B63BD11CB13 /* EudiWalletCore.swift */,);
 			path = Runner;
 			sourceTree = "<group>";
 		};
@@ -397,6 +409,10 @@
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
+				54C58F18A7384F3F897F8307 /* SsiApi.swift in Sources */,
+				E06E81691CA343119456178A /* SprucekitSsiApiImpl.swift in Sources */,
+				76D12D674824438CA9749200 /* EudiSsiApiImpl.swift in Sources */,
+				C2EDB33A0C694C0B8BCD629B /* EudiWalletCore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

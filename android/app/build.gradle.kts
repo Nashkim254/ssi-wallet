@@ -24,7 +24,7 @@ android {
         applicationId = "com.example.ssi"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 26  // EUDI Wallet requires Android 8.0 (API 26) or higher
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -40,6 +40,16 @@ android {
         jniLibs {
             useLegacyPackaging = false
         }
+        resources {
+            excludes += setOf(
+                "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt"
+            )
+        }
     }
 
     buildTypes {
@@ -53,4 +63,16 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // EU Digital Identity Wallet Core Library
+    implementation("eu.europa.ec.eudi:eudi-lib-android-wallet-core:0.23.0")
+
+    // Biometric authentication support
+    implementation("androidx.biometric:biometric-ktx:1.2.0-alpha05")
+
+    // Additional Android dependencies
+    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
 }

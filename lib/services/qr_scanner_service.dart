@@ -22,13 +22,18 @@ class QrScannerService {
       _logger.i('Processing QR code: $data');
 
       // Determine the type of QR code
-      if (data.startsWith('openid-credential-offer://')) {
+      // EUDI/HAIP credential offer schemes
+      if (data.startsWith('openid-credential-offer://') ||
+          data.startsWith('haip-vci://') ||
+          data.startsWith('openid4vci://')) {
         return QrScanResult(
           type: QrCodeType.credentialOffer,
           data: data,
           isValid: true,
         );
-      } else if (data.startsWith('openid://')) {
+      } else if (data.startsWith('openid://') ||
+          data.startsWith('haip-vp://') ||
+          data.startsWith('openid4vp://')) {
         return QrScanResult(
           type: QrCodeType.presentationRequest,
           data: data,

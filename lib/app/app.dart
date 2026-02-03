@@ -27,7 +27,7 @@ import 'package:ssi/ui/views/activity/activity_view.dart';
   routes: [
     MaterialRoute(page: HomeView),
     MaterialRoute(page: StartupView),
-    MaterialRoute(page: SplashView),
+    MaterialRoute(page: SplashView, path: '/'),
     MaterialRoute(page: OnboardingView),
     MaterialRoute(page: CredentialsView),
     MaterialRoute(page: SettingsView),

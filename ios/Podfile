@@ -1,5 +1,5 @@
 # Uncomment this line to define a global platform for your project
-# platform :ios, '13.0'
+platform :ios, '16.0'  # EUDI Wallet Kit requires iOS 16.0 or higher
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -31,6 +31,10 @@ target 'Runner' do
   use_frameworks!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # Note: EUDI Wallet Kit is distributed as Swift Package Manager, not CocoaPods
+  # We'll implement a compatible version manually
+
   target 'RunnerTests' do
     inherit! :search_paths
   end

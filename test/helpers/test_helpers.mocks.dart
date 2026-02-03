@@ -1080,6 +1080,16 @@ class MockDidService extends _i1.Mock implements _i12.DidService {
       ) as List<_i13.Did>);
 
   @override
+  _i6.Future<void> initialize() => (super.noSuchMethod(
+        Invocation.method(
+          #initialize,
+          [],
+        ),
+        returnValue: _i6.Future<void>.value(),
+        returnValueForMissingStub: _i6.Future<void>.value(),
+      ) as _i6.Future<void>);
+
+  @override
   _i6.Future<void> loadDids() => (super.noSuchMethod(
         Invocation.method(
           #loadDids,
@@ -1244,6 +1254,16 @@ class MockCredentialService extends _i1.Mock implements _i14.CredentialService {
         returnValue: <_i15.Credential>[],
         returnValueForMissingStub: <_i15.Credential>[],
       ) as List<_i15.Credential>);
+
+  @override
+  _i6.Future<void> initialize() => (super.noSuchMethod(
+        Invocation.method(
+          #initialize,
+          [],
+        ),
+        returnValue: _i6.Future<void>.value(),
+        returnValueForMissingStub: _i6.Future<void>.value(),
+      ) as _i6.Future<void>);
 
   @override
   _i6.Future<void> loadCredentials() => (super.noSuchMethod(
@@ -1412,21 +1432,20 @@ class MockProcivisService extends _i1.Mock implements _i16.ProcivisService {
       ) as _i6.Future<List<Map<String, dynamic>>>);
 
   @override
-  _i6.Future<Map<String, dynamic>?> getDid(String? didId) =>
-      (super.noSuchMethod(
+  _i6.Future<Map<String, dynamic>?> getDid(String? id) => (super.noSuchMethod(
         Invocation.method(
           #getDid,
-          [didId],
+          [id],
         ),
         returnValue: _i6.Future<Map<String, dynamic>?>.value(),
         returnValueForMissingStub: _i6.Future<Map<String, dynamic>?>.value(),
       ) as _i6.Future<Map<String, dynamic>?>);
 
   @override
-  _i6.Future<bool> deleteDid(String? didId) => (super.noSuchMethod(
+  _i6.Future<bool> deleteDid(String? id) => (super.noSuchMethod(
         Invocation.method(
           #deleteDid,
-          [didId],
+          [id],
         ),
         returnValue: _i6.Future<bool>.value(false),
         returnValueForMissingStub: _i6.Future<bool>.value(false),
@@ -1446,63 +1465,75 @@ class MockProcivisService extends _i1.Mock implements _i16.ProcivisService {
       ) as _i6.Future<List<Map<String, dynamic>>>);
 
   @override
-  _i6.Future<Map<String, dynamic>?> getCredential(String? credentialId) =>
+  _i6.Future<Map<String, dynamic>?> getCredential(String? id) =>
       (super.noSuchMethod(
         Invocation.method(
           #getCredential,
-          [credentialId],
+          [id],
         ),
         returnValue: _i6.Future<Map<String, dynamic>?>.value(),
         returnValueForMissingStub: _i6.Future<Map<String, dynamic>?>.value(),
       ) as _i6.Future<Map<String, dynamic>?>);
 
   @override
-  _i6.Future<Map<String, dynamic>?> acceptCredentialOffer(String? offerUrl) =>
+  _i6.Future<Map<String, dynamic>?> acceptCredentialOffer(
+    String? offerUrl, {
+    String? holderDidId,
+  }) =>
       (super.noSuchMethod(
         Invocation.method(
           #acceptCredentialOffer,
           [offerUrl],
+          {#holderDidId: holderDidId},
         ),
         returnValue: _i6.Future<Map<String, dynamic>?>.value(),
         returnValueForMissingStub: _i6.Future<Map<String, dynamic>?>.value(),
       ) as _i6.Future<Map<String, dynamic>?>);
 
   @override
-  _i6.Future<bool> deleteCredential(String? credentialId) =>
-      (super.noSuchMethod(
+  _i6.Future<bool> deleteCredential(String? id) => (super.noSuchMethod(
         Invocation.method(
           #deleteCredential,
-          [credentialId],
+          [id],
         ),
         returnValue: _i6.Future<bool>.value(false),
         returnValueForMissingStub: _i6.Future<bool>.value(false),
       ) as _i6.Future<bool>);
 
   @override
-  _i6.Future<Map<String, dynamic>?> processPresentationRequest(
-          String? requestUrl) =>
+  _i6.Future<Map<String, dynamic>?> checkCredentialStatus(String? id) =>
       (super.noSuchMethod(
         Invocation.method(
-          #processPresentationRequest,
-          [requestUrl],
+          #checkCredentialStatus,
+          [id],
         ),
         returnValue: _i6.Future<Map<String, dynamic>?>.value(),
         returnValueForMissingStub: _i6.Future<Map<String, dynamic>?>.value(),
       ) as _i6.Future<Map<String, dynamic>?>);
 
   @override
-  _i6.Future<bool> submitPresentation({
-    required String? interactionId,
-    required List<String>? selectedCredentialIds,
-  }) =>
+  _i6.Future<Map<String, dynamic>?> processPresentationRequest(String? url) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #processPresentationRequest,
+          [url],
+        ),
+        returnValue: _i6.Future<Map<String, dynamic>?>.value(),
+        returnValueForMissingStub: _i6.Future<Map<String, dynamic>?>.value(),
+      ) as _i6.Future<Map<String, dynamic>?>);
+
+  @override
+  _i6.Future<bool> submitPresentation(
+    String? interactionId,
+    List<String>? credentialIds,
+  ) =>
       (super.noSuchMethod(
         Invocation.method(
           #submitPresentation,
-          [],
-          {
-            #interactionId: interactionId,
-            #selectedCredentialIds: selectedCredentialIds,
-          },
+          [
+            interactionId,
+            credentialIds,
+          ],
         ),
         returnValue: _i6.Future<bool>.value(false),
         returnValueForMissingStub: _i6.Future<bool>.value(false),
@@ -1533,26 +1564,14 @@ class MockProcivisService extends _i1.Mock implements _i16.ProcivisService {
       ) as _i6.Future<List<Map<String, dynamic>>>);
 
   @override
-  _i6.Future<Map<String, dynamic>?> checkCredentialStatus(
-          String? credentialId) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #checkCredentialStatus,
-          [credentialId],
-        ),
-        returnValue: _i6.Future<Map<String, dynamic>?>.value(),
-        returnValueForMissingStub: _i6.Future<Map<String, dynamic>?>.value(),
-      ) as _i6.Future<Map<String, dynamic>?>);
-
-  @override
-  _i6.Future<String?> exportBackup() => (super.noSuchMethod(
+  _i6.Future<Map<String, dynamic>?> exportBackup() => (super.noSuchMethod(
         Invocation.method(
           #exportBackup,
           [],
         ),
-        returnValue: _i6.Future<String?>.value(),
-        returnValueForMissingStub: _i6.Future<String?>.value(),
-      ) as _i6.Future<String?>);
+        returnValue: _i6.Future<Map<String, dynamic>?>.value(),
+        returnValueForMissingStub: _i6.Future<Map<String, dynamic>?>.value(),
+      ) as _i6.Future<Map<String, dynamic>?>);
 
   @override
   _i6.Future<bool> importBackup(String? backupData) => (super.noSuchMethod(
@@ -1586,12 +1605,10 @@ class MockProcivisService extends _i1.Mock implements _i16.ProcivisService {
       ) as _i6.Future<List<String>>);
 
   @override
-  _i6.Future<bool> uninitialize({bool? deleteData = false}) =>
-      (super.noSuchMethod(
+  _i6.Future<bool> uninitialize() => (super.noSuchMethod(
         Invocation.method(
           #uninitialize,
           [],
-          {#deleteData: deleteData},
         ),
         returnValue: _i6.Future<bool>.value(false),
         returnValueForMissingStub: _i6.Future<bool>.value(false),

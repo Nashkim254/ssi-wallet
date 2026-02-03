@@ -55,6 +55,12 @@ class HomeView extends StackedView<HomeViewModel> {
                 titlePadding: const EdgeInsets.only(left: 20, bottom: 12),
               ),
               actions: [
+                // Debug Logs
+                IconButton(
+                  icon: const Icon(Icons.bug_report_outlined),
+                  onPressed: viewModel.navigateToDebug,
+                  tooltip: 'Debug Logs',
+                ),
                 // Notifications
                 IconButton(
                   icon: Stack(

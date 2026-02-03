@@ -113,7 +113,10 @@ class CredentialService {
       final result = await _procivisService.acceptCredentialOffer(offerUrl);
 
       if (result != null) {
+        _logger.i('Credential offer accepted successfully.');
+        _logger.d('Received credential: ${result}');
         final credential = Credential.fromJson(result);
+        _logger.d('Received credential: ${credential.toJson()}');
 
         // Save to cache immediately
         await _credentialsBox.put(credential.id, credential.toJson());

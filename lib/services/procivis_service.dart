@@ -1,51 +1,43 @@
-import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
+import 'package:ssi/pigeon/ssi_api.g.dart';
 
-/// Service for communicating with Procivis One Core via platform channels
+/// Service for communicating with native SSI SDK via Pigeon API
 class ProcivisService {
-  static const MethodChannel _channel =
-      MethodChannel('com.ssi.wallet/procivis');
+  final _api = SsiApi();
   final Logger _logger = Logger();
 
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
 
-  /// Initialize the Procivis One Core
+  /// Initialize the SSI SDK
   Future<bool> initialize() async {
     try {
-      _logger.i('Initializing Procivis One Core...');
-      final result = await _channel.invokeMethod('initializeCore');
+      _logger.i('Initializing SSI SDK...');
+      final result = await _api.initialize();
 
-      // Handle different return types from the platform
-      if (result is bool) {
-        _isInitialized = result;
-      } else if (result is Map) {
-        // If platform returns a Map, check for success key or default to true
-        _isInitialized = (result['success'] as bool?) ?? true;
+      _isInitialized = result.success;
+
+      if (!result.success && result.error != null) {
+        _logger.e('Failed to initialize SSI SDK: ${result.error}');
       } else {
-        // For any other type or null, default to true (optimistic initialization)
-        _isInitialized = result != null;
+        _logger.i('SSI SDK initialized successfully');
       }
 
-      _logger.i('Procivis One Core initialized: $_isInitialized');
       return _isInitialized;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to initialize Procivis Core: ${e.message}');
-      return false;
     } catch (e) {
-      _logger.e('Unexpected error initializing Procivis Core: $e');
+      _logger.e('Unexpected error initializing SSI SDK: $e');
       return false;
     }
   }
 
-  /// Get the version of Procivis One Core
+  /// Get the version of the SSI SDK
   Future<String?> getVersion() async {
     try {
-      final version = await _channel.invokeMethod<String>('getVersion');
-      _logger.d('Procivis One Core version: $version');
+      final version = _api.getVersion();
+      _logger.d('SSI SDK version: $version');
       return version;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to get version: ${e.message}');
+    } catch (e) {
+      _logger.e('Failed to get version: $e');
       return null;
     }
   }
@@ -57,17 +49,14 @@ class ProcivisService {
   }) async {
     try {
       _logger.i('Creating DID with method: $method, keyType: $keyType');
-      final result = await _channel.invokeMethod<Map>('createDid', {
-        'method': method,
-        'keyType': keyType,
-      });
+      final did = await _api.createDid(method, keyType);
 
-      if (result != null) {
-        return Map<String, dynamic>.from(result);
+      if (did != null) {
+        return _didDtoToMap(did);
       }
       return null;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to create DID: ${e.message}');
+    } catch (e) {
+      _logger.e('Failed to create DID: $e');
       return null;
     }
   }
@@ -75,40 +64,34 @@ class ProcivisService {
   /// Get all DIDs
   Future<List<Map<String, dynamic>>> getDids() async {
     try {
-      final result = await _channel.invokeMethod<List>('getDids');
-      if (result != null) {
-        return result.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      }
-      return [];
-    } on PlatformException catch (e) {
-      _logger.e('Failed to get DIDs: ${e.message}');
+      final dids = await _api.getDids();
+      return dids.map(_didDtoToMap).toList();
+    } catch (e) {
+      _logger.e('Failed to get DIDs: $e');
       return [];
     }
   }
 
-  /// Get a specific DID by ID
-  Future<Map<String, dynamic>?> getDid(String didId) async {
+  /// Get a specific DID
+  Future<Map<String, dynamic>?> getDid(String id) async {
     try {
-      final result =
-          await _channel.invokeMethod<Map>('getDid', {'didId': didId});
-      if (result != null) {
-        return Map<String, dynamic>.from(result);
+      final did = await _api.getDid(id);
+      if (did != null) {
+        return _didDtoToMap(did);
       }
       return null;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to get DID: ${e.message}');
+    } catch (e) {
+      _logger.e('Failed to get DID: $e');
       return null;
     }
   }
 
   /// Delete a DID
-  Future<bool> deleteDid(String didId) async {
+  Future<bool> deleteDid(String id) async {
     try {
-      final result =
-          await _channel.invokeMethod<bool>('deleteDid', {'didId': didId});
-      return result ?? false;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to delete DID: ${e.message}');
+      return await _api.deleteDid(id);
+    } catch (e) {
+      _logger.e('Failed to delete DID: $e');
       return false;
     }
   }
@@ -116,96 +99,89 @@ class ProcivisService {
   /// Get all credentials
   Future<List<Map<String, dynamic>>> getCredentials() async {
     try {
-      final result = await _channel.invokeMethod<List>('getCredentials');
-      if (result != null) {
-        return result.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      }
-      return [];
-    } on PlatformException catch (e) {
-      _logger.e('Failed to get credentials: ${e.message}');
+      final credentials = await _api.getCredentials();
+      return credentials.map(_credentialDtoToMap).toList();
+    } catch (e) {
+      _logger.e('Failed to get credentials: $e');
       return [];
     }
   }
 
-  /// Get a specific credential by ID
-  Future<Map<String, dynamic>?> getCredential(String credentialId) async {
+  /// Get a specific credential
+  Future<Map<String, dynamic>?> getCredential(String id) async {
     try {
-      final result = await _channel.invokeMethod<Map>('getCredential', {
-        'credentialId': credentialId,
-      });
-      if (result != null) {
-        return Map<String, dynamic>.from(result);
+      final credential = await _api.getCredential(id);
+      if (credential != null) {
+        return _credentialDtoToMap(credential);
       }
       return null;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to get credential: ${e.message}');
+    } catch (e) {
+      _logger.e('Failed to get credential: $e');
       return null;
     }
   }
 
   /// Accept a credential offer
-  Future<Map<String, dynamic>?> acceptCredentialOffer(String offerUrl) async {
+  Future<Map<String, dynamic>?> acceptCredentialOffer(
+    String offerUrl, {
+    String? holderDidId,
+  }) async {
     try {
-      _logger.i('Accepting credential offer: $offerUrl');
-      final result = await _channel.invokeMethod<Map>('acceptCredentialOffer', {
-        'offerUrl': offerUrl,
-      });
-      if (result != null) {
-        return Map<String, dynamic>.from(result);
+      final credential = await _api.acceptCredentialOffer(offerUrl, holderDidId);
+      if (credential != null) {
+        return _credentialDtoToMap(credential);
       }
       return null;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to accept credential offer: ${e.message}');
+    } catch (e) {
+      _logger.e('Failed to accept credential offer: $e');
       return null;
     }
   }
 
   /// Delete a credential
-  Future<bool> deleteCredential(String credentialId) async {
+  Future<bool> deleteCredential(String id) async {
     try {
-      final result = await _channel.invokeMethod<bool>('deleteCredential', {
-        'credentialId': credentialId,
-      });
-      return result ?? false;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to delete credential: ${e.message}');
+      return await _api.deleteCredential(id);
+    } catch (e) {
+      _logger.e('Failed to delete credential: $e');
       return false;
     }
   }
 
-  /// Process a presentation request
-  Future<Map<String, dynamic>?> processPresentationRequest(
-      String requestUrl) async {
+  /// Check credential status
+  Future<Map<String, dynamic>?> checkCredentialStatus(String id) async {
     try {
-      _logger.i('Processing presentation request: $requestUrl');
-      final result =
-          await _channel.invokeMethod<Map>('processPresentationRequest', {
-        'requestUrl': requestUrl,
-      });
-      if (result != null) {
-        return Map<String, dynamic>.from(result);
+      final status = await _api.checkCredentialStatus(id);
+      return {'status': status};
+    } catch (e) {
+      _logger.e('Failed to check credential status: $e');
+      return null;
+    }
+  }
+
+  /// Process a presentation request
+  Future<Map<String, dynamic>?> processPresentationRequest(String url) async {
+    try {
+      final interaction = await _api.processPresentationRequest(url);
+      if (interaction != null) {
+        return _interactionDtoToMap(interaction);
       }
       return null;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to process presentation request: ${e.message}');
+    } catch (e) {
+      _logger.e('Failed to process presentation request: $e');
       return null;
     }
   }
 
   /// Submit a presentation
-  Future<bool> submitPresentation({
-    required String interactionId,
-    required List<String> selectedCredentialIds,
-  }) async {
+  Future<bool> submitPresentation(
+    String interactionId,
+    List<String> credentialIds,
+  ) async {
     try {
-      _logger.i('Submitting presentation for interaction: $interactionId');
-      final result = await _channel.invokeMethod<bool>('submitPresentation', {
-        'interactionId': interactionId,
-        'selectedCredentialIds': selectedCredentialIds,
-      });
-      return result ?? false;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to submit presentation: ${e.message}');
+      return await _api.submitPresentation(interactionId, credentialIds);
+    } catch (e) {
+      _logger.e('Failed to submit presentation: $e');
       return false;
     }
   }
@@ -213,13 +189,9 @@ class ProcivisService {
   /// Reject a presentation request
   Future<bool> rejectPresentationRequest(String interactionId) async {
     try {
-      final result =
-          await _channel.invokeMethod<bool>('rejectPresentationRequest', {
-        'interactionId': interactionId,
-      });
-      return result ?? false;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to reject presentation request: ${e.message}');
+      return await _api.rejectPresentationRequest(interactionId);
+    } catch (e) {
+      _logger.e('Failed to reject presentation request: $e');
       return false;
     }
   }
@@ -227,56 +199,31 @@ class ProcivisService {
   /// Get interaction history
   Future<List<Map<String, dynamic>>> getInteractionHistory() async {
     try {
-      final result = await _channel.invokeMethod<List>('getInteractionHistory');
-      if (result != null) {
-        return result.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      }
-      return [];
-    } on PlatformException catch (e) {
-      _logger.e('Failed to get interaction history: ${e.message}');
+      final interactions = await _api.getInteractionHistory();
+      return interactions.map(_interactionDtoToMap).toList();
+    } catch (e) {
+      _logger.e('Failed to get interaction history: $e');
       return [];
     }
   }
 
-  /// Check credential status (revoked, suspended, etc.)
-  Future<Map<String, dynamic>?> checkCredentialStatus(
-      String credentialId) async {
+  /// Export backup
+  Future<Map<String, dynamic>?> exportBackup() async {
     try {
-      final result = await _channel.invokeMethod<Map>('checkCredentialStatus', {
-        'credentialId': credentialId,
-      });
-      if (result != null) {
-        return Map<String, dynamic>.from(result);
-      }
-      return null;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to check credential status: ${e.message}');
+      final backup = await _api.exportBackup();
+      return Map<String, dynamic>.from(backup);
+    } catch (e) {
+      _logger.e('Failed to export backup: $e');
       return null;
     }
   }
 
-  /// Export backup data
-  Future<String?> exportBackup() async {
-    try {
-      _logger.i('Exporting backup...');
-      final result = await _channel.invokeMethod<String>('exportBackup');
-      return result;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to export backup: ${e.message}');
-      return null;
-    }
-  }
-
-  /// Import backup data
+  /// Import backup
   Future<bool> importBackup(String backupData) async {
     try {
-      _logger.i('Importing backup...');
-      final result = await _channel.invokeMethod<bool>('importBackup', {
-        'backupData': backupData,
-      });
-      return result ?? false;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to import backup: ${e.message}');
+      return await _api.importBackup(backupData);
+    } catch (e) {
+      _logger.e('Failed to import backup: $e');
       return false;
     }
   }
@@ -284,14 +231,9 @@ class ProcivisService {
   /// Get supported DID methods
   Future<List<String>> getSupportedDidMethods() async {
     try {
-      final result =
-          await _channel.invokeMethod<List>('getSupportedDidMethods');
-      if (result != null) {
-        return result.map((e) => e.toString()).toList();
-      }
-      return [];
-    } on PlatformException catch (e) {
-      _logger.e('Failed to get supported DID methods: ${e.message}');
+      return await _api.getSupportedDidMethods();
+    } catch (e) {
+      _logger.e('Failed to get supported DID methods: $e');
       return [];
     }
   }
@@ -299,31 +241,66 @@ class ProcivisService {
   /// Get supported credential formats
   Future<List<String>> getSupportedCredentialFormats() async {
     try {
-      final result =
-          await _channel.invokeMethod<List>('getSupportedCredentialFormats');
-      if (result != null) {
-        return result.map((e) => e.toString()).toList();
-      }
-      return [];
-    } on PlatformException catch (e) {
-      _logger.e('Failed to get supported credential formats: ${e.message}');
+      return await _api.getSupportedCredentialFormats();
+    } catch (e) {
+      _logger.e('Failed to get supported credential formats: $e');
       return [];
     }
   }
 
-  /// Uninitialize the core (cleanup)
-  Future<bool> uninitialize({bool deleteData = false}) async {
+  /// Uninitialize the SDK
+  Future<bool> uninitialize() async {
     try {
-      _logger
-          .i('Uninitializing Procivis One Core (deleteData: $deleteData)...');
-      final result = await _channel.invokeMethod<bool>('uninitialize', {
-        'deleteData': deleteData,
-      });
-      _isInitialized = false;
-      return result ?? false;
-    } on PlatformException catch (e) {
-      _logger.e('Failed to uninitialize: ${e.message}');
+      final result = await _api.uninitialize();
+      _isInitialized = !result;
+      return result;
+    } catch (e) {
+      _logger.e('Failed to uninitialize SDK: $e');
       return false;
     }
+  }
+
+  // Helper methods to convert DTOs to Maps
+  Map<String, dynamic> _didDtoToMap(DidDto did) {
+    return {
+      'id': did.id,
+      'didString': did.didString,
+      'method': did.method,
+      'keyType': did.keyType,
+      'createdAt': did.createdAt,
+      'isDefault': did.isDefault,
+      'metadata': did.metadata,
+    };
+  }
+
+  Map<String, dynamic> _credentialDtoToMap(CredentialDto credential) {
+    return {
+      'id': credential.id,
+      'name': credential.name,
+      'type': credential.type,
+      'format': credential.format,
+      'issuerName': credential.issuerName,
+      'issuerDid': credential.issuerDid,
+      'holderDid': credential.holderDid,
+      'issuedDate': credential.issuedDate,
+      'expiryDate': credential.expiryDate,
+      'claims': credential.claims,
+      'proofType': credential.proofType,
+      'state': credential.state,
+      'backgroundColor': credential.backgroundColor,
+      'textColor': credential.textColor,
+    };
+  }
+
+  Map<String, dynamic> _interactionDtoToMap(InteractionDto interaction) {
+    return {
+      'id': interaction.id,
+      'type': interaction.type,
+      'verifierName': interaction.verifierName,
+      'requestedCredentials': interaction.requestedCredentials,
+      'timestamp': interaction.timestamp,
+      'status': interaction.status,
+      'completedAt': interaction.completedAt,
+    };
   }
 }

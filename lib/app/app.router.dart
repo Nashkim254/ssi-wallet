@@ -28,7 +28,7 @@ class Routes {
 
   static const startupView = '/startup-view';
 
-  static const splashView = '/splash-view';
+  static const splashView = '/';
 
   static const onboardingView = '/onboarding-view';
 

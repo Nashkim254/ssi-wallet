@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:ssi/app/app.locator.dart';
 import 'package:ssi/app/app.router.dart';
@@ -12,6 +13,9 @@ class HomeViewModel extends BaseViewModel {
   final _navigationService = locator<NavigationService>();
   final _credentialService = locator<CredentialService>();
   final _didService = locator<DidService>();
+
+  StreamSubscription? _credentialsSubscription;
+  StreamSubscription? _didsSubscription;
 
   List<Credential> get recentCredentials =>
       _credentialService.credentials.take(5).toList();
@@ -31,6 +35,15 @@ class HomeViewModel extends BaseViewModel {
     setBusy(true);
 
     try {
+      // Subscribe to credential and DID streams for real-time updates
+      _credentialsSubscription = _credentialService.credentialsStream.listen((_) {
+        notifyListeners(); // Rebuild UI when credentials change
+      });
+
+      _didsSubscription = _didService.didsStream.listen((_) {
+        notifyListeners(); // Rebuild UI when DIDs change
+      });
+
       // Load credentials and DIDs
       await Future.wait([
         _credentialService.loadCredentials(),
@@ -42,6 +55,13 @@ class HomeViewModel extends BaseViewModel {
     } finally {
       setBusy(false);
     }
+  }
+
+  @override
+  void dispose() {
+    _credentialsSubscription?.cancel();
+    _didsSubscription?.cancel();
+    super.dispose();
   }
 
   void navigateToScan() {

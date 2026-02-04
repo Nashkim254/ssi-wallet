@@ -11,9 +11,32 @@ class QrScannerService {
   }
 
   /// Request camera permission
+  /// Returns true if granted, false otherwise
+  /// Throws PermissionPermanentlyDeniedException if permanently denied
   Future<bool> requestCameraPermission() async {
-    final status = await Permission.camera.request();
-    return status.isGranted;
+    final status = await Permission.camera.status;
+
+    // If permanently denied, need to open settings
+    if (status.isPermanentlyDenied) {
+      _logger.w('Camera permission permanently denied');
+      throw PermissionPermanentlyDeniedException();
+    }
+
+    // Request permission
+    final result = await Permission.camera.request();
+
+    // If denied after request, might be permanent now
+    if (result.isPermanentlyDenied) {
+      _logger.w('Camera permission permanently denied after request');
+      throw PermissionPermanentlyDeniedException();
+    }
+
+    return result.isGranted;
+  }
+
+  /// Open app settings
+  Future<void> openSettings() async {
+    await openAppSettings();
   }
 
   /// Process scanned QR code data
@@ -123,4 +146,8 @@ enum QrCodeType {
   presentationRequest,
   didConnection,
   unknown,
+}
+
+class PermissionPermanentlyDeniedException implements Exception {
+  final String message = 'Permission permanently denied. Please enable it in Settings.';
 }

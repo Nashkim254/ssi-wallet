@@ -62,5 +62,9 @@
 			</array>
 		</dict>
 	</array>
+	<key>NFCReaderUsageDescription</key>
+	<string>This app needs NFC access to exchange digital credentials</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>This app uses Face ID for secure authentication</string>
 </dict>
 </plist>

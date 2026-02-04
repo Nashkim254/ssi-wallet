@@ -12,12 +12,20 @@ import Flutter
     ) -> Bool {
         GeneratedPluginRegistrant.register(with: self)
 
-        // Set up EUDI Wallet SSI API using Pigeon with registry
-        let messenger = self.registrar(forPlugin: "SsiApi")!.messenger()
-        ssiApiImpl = EudiSsiApiImpl()
-        SsiApiSetup.setUp(binaryMessenger: messenger, api: ssiApiImpl)
+        // TEMPORARILY DISABLED: Pigeon API setup
+        // Will set up after Flutter is fully ready
 
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    }
+
+    override func applicationDidBecomeActive(_ application: UIApplication) {
+        super.applicationDidBecomeActive(application)
+
+        // Set up EUDI Wallet SSI API using Pigeon once app is active
+        if ssiApiImpl == nil, let controller = window?.rootViewController as? FlutterViewController {
+            ssiApiImpl = EudiSsiApiImpl()
+            SsiApiSetup.setUp(binaryMessenger: controller.binaryMessenger, api: ssiApiImpl)
+        }
     }
 
     override func application(

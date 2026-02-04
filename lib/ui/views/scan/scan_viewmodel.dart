@@ -35,19 +35,21 @@ class ScanViewModel extends BaseViewModel {
       detectionSpeed: DetectionSpeed.noDuplicates,
     );
 
-    // Check camera permission
-    _hasPermission = await _qrScannerService.hasCameraPermission();
-
-    if (!_hasPermission) {
-      _hasPermission = await _qrScannerService.requestCameraPermission();
-    }
-
+    // Let MobileScanner widget handle permission automatically
+    // It will show iOS native permission dialog on first use
+    _hasPermission = true;
     notifyListeners();
   }
 
   Future<void> requestPermission() async {
-    _hasPermission = await _qrScannerService.requestCameraPermission();
-    notifyListeners();
+    // If permission was denied, just open Settings
+    // User needs to manually enable camera there
+    await _qrScannerService.openSettings();
+
+    _snackbarService.showSnackbar(
+      message: 'Find "Ssi" in Settings and enable Camera',
+      duration: const Duration(seconds: 5),
+    );
   }
 
   Future<void> onQRDetected(BarcodeCapture capture) async {

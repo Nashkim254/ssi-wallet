@@ -34,10 +34,17 @@ void main() async {
   // Initialize Procivis SDK (suppress errors gracefully)
   try {
     final procivisService = locator<ProcivisService>();
-    await procivisService.initialize();
+    // Delay initialization to allow native side to set up
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      try {
+        await procivisService.initialize();
+      } catch (e) {
+        print('Warning: Procivis SDK initialization failed: $e');
+      }
+    });
   } catch (e) {
     // Log error but don't block app launch
-    print('Warning: Procivis SDK initialization failed: $e');
+    print('Warning: Procivis SDK setup failed: $e');
   }
 
   // Set system UI overlay style

@@ -73,34 +73,122 @@ class EudiSsiApiImpl: NSObject, SsiApi {
         method: String, keyType: String, completion: @escaping (Result<DidDto?, Error>) -> Void
     ) {
         Task {
-            let didId = "did-\(UUID().uuidString)"
-            let didString = generateDidString(method: method)
-            let isDefault = dids.isEmpty
+            do {
+                print("[EudiSsiApiImpl] ========================================")
+                print("[EudiSsiApiImpl] createDid() called with method: \(method), keyType: \(keyType)")
 
-            if isDefault {
-                for i in 0..<dids.count {
-                    dids[i].isDefault = false
+                guard isInitialized, let wallet = wallet as? EudiWallet else {
+                    print("[EudiSsiApiImpl] Wallet not initialized, creating mock DID")
+                    let didId = "did-\(UUID().uuidString)"
+                    let didString = generateDidString(method: method)
+                    let isDefault = dids.isEmpty
+
+                    let newDid = DidDto(
+                        id: didId,
+                        didString: didString,
+                        method: method,
+                        keyType: keyType,
+                        createdAt: ISO8601DateFormatter().string(from: Date()),
+                        isDefault: isDefault,
+                        metadata: ["source": "manual", "sdk": false]
+                    )
+
+                    dids.append(newDid)
+                    completion(.success(newDid))
+                    return
                 }
+
+                // The EUDI SDK manages keys internally
+                // We'll create a DID that represents usage of the SDK's internal key management
+                let didId = "did-manual-\(UUID().uuidString)"
+                let didString = generateDidString(method: method)
+                let isDefault = dids.filter { $0.id != "did-wallet-holder" }.isEmpty
+
+                // Update other manual DIDs to not be default
+                if isDefault {
+                    for i in 0..<dids.count {
+                        if dids[i].id != "did-wallet-holder" {
+                            dids[i].isDefault = false
+                        }
+                    }
+                }
+
+                let newDid = DidDto(
+                    id: didId,
+                    didString: didString,
+                    method: method,
+                    keyType: keyType,
+                    createdAt: ISO8601DateFormatter().string(from: Date()),
+                    isDefault: isDefault,
+                    metadata: ["source": "manual", "sdk": true, "walletKeys": wallet.storage.docModels.count]
+                )
+
+                dids.append(newDid)
+                print("[EudiSsiApiImpl] Created manual DID: \(didString)")
+                completion(.success(newDid))
+            } catch {
+                print("[EudiSsiApiImpl] Error creating DID: \(error)")
+                completion(.failure(error))
             }
-
-            let newDid = DidDto(
-                id: didId,
-                didString: didString,
-                method: method,
-                keyType: keyType,
-                createdAt: ISO8601DateFormatter().string(from: Date()),
-                isDefault: isDefault,
-                metadata: nil
-            )
-
-            dids.append(newDid)
-            completion(.success(newDid))
         }
     }
 
     func getDids(completion: @escaping (Result<[DidDto], Error>) -> Void) {
         Task {
-            completion(.success(dids))
+            do {
+                print("[EudiSsiApiImpl] ========================================")
+                print("[EudiSsiApiImpl] getDids() called")
+
+                guard isInitialized, let wallet = wallet as? EudiWallet else {
+                    print("[EudiSsiApiImpl] Wallet not initialized, returning cached DIDs")
+                    completion(.success(dids))
+                    return
+                }
+
+                // Extract DIDs from credentials in the wallet
+                var extractedDids: [DidDto] = []
+
+                // Get all documents (count from different sources)
+                let issuedDocs = wallet.storage.docModels
+                let pendingCount = wallet.storage.pendingDocuments.count
+                let deferredCount = wallet.storage.deferredDocuments.count
+                let totalCredentials = issuedDocs.count + pendingCount + deferredCount
+
+                print("[EudiSsiApiImpl] Found \(issuedDocs.count) issued, \(pendingCount) pending, \(deferredCount) deferred documents")
+
+                // Create a DID entry for the wallet's holder
+                // The EUDI SDK manages keys internally, we'll create a representative DID
+                if totalCredentials > 0 {
+                    let walletDidId = "did-wallet-holder"
+
+                    // Check if we already have this DID
+                    if !dids.contains(where: { $0.id == walletDidId }) {
+                        let walletDid = DidDto(
+                            id: walletDidId,
+                            didString: "did:key:z6Mk\(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(44))",
+                            method: "did:key",
+                            keyType: "Ed25519",
+                            createdAt: ISO8601DateFormatter().string(from: Date()),
+                            isDefault: true,
+                            metadata: ["source": "EUDI Wallet", "credentials": totalCredentials]
+                        )
+                        extractedDids.append(walletDid)
+                        print("[EudiSsiApiImpl] Created wallet holder DID: \(walletDid.didString)")
+                    }
+                }
+
+                // Merge with any manually created DIDs
+                let allDids = extractedDids + dids.filter { $0.id != "did-wallet-holder" }
+
+                // Update internal storage
+                dids = allDids
+
+                print("[EudiSsiApiImpl] Returning \(allDids.count) DIDs")
+                completion(.success(allDids))
+            } catch {
+                print("[EudiSsiApiImpl] Error getting DIDs: \(error)")
+                completion(.success(dids))
+            }
         }
     }
 
@@ -141,17 +229,48 @@ class EudiSsiApiImpl: NSObject, SsiApi {
                 }
 
                 print("[EudiSsiApiImpl] Fetching credentials from wallet storage...")
-                let documents = wallet.storage.docModels
-                print("[EudiSsiApiImpl] Found \(documents.count) documents in storage")
 
-                for (index, doc) in documents.enumerated() {
-                    print(
-                        "[EudiSsiApiImpl] Document \(index): id=\(doc.id), type=\(doc.docType ?? "nil")"
+                // Get all documents (issued, pending, and deferred)
+                let issuedDocs = wallet.storage.docModels
+                let pendingDocs = wallet.storage.pendingDocuments
+                let deferredDocs = wallet.storage.deferredDocuments
+
+                print("[EudiSsiApiImpl] Found \(issuedDocs.count) issued, \(pendingDocs.count) pending, \(deferredDocs.count) deferred documents")
+
+                // Map issued documents
+                var credentials = issuedDocs.map { documentToCredentialDto($0) }
+
+                // Add pending documents
+                for doc in pendingDocs {
+                    let credential = CredentialDto(
+                        id: doc.id,
+                        name: doc.docType ?? "Credential",
+                        type: doc.docType ?? "VerifiableCredential",
+                        format: "mso_mdoc",
+                        issuerName: "EUDI Issuer",
+                        issuedDate: ISO8601DateFormatter().string(from: doc.createdAt),
+                        claims: [:],
+                        state: "pending"
                     )
+                    credentials.append(credential)
                 }
 
-                let credentials = documents.map { documentToCredentialDto($0) }
-                print("[EudiSsiApiImpl] Mapped to \(credentials.count) credentials")
+                // Add deferred documents
+                for doc in deferredDocs {
+                    let credential = CredentialDto(
+                        id: doc.id,
+                        name: doc.docType ?? "Credential",
+                        type: doc.docType ?? "VerifiableCredential",
+                        format: "mso_mdoc",
+                        issuerName: "EUDI Issuer",
+                        issuedDate: ISO8601DateFormatter().string(from: doc.createdAt),
+                        claims: [:],
+                        state: "deferred"
+                    )
+                    credentials.append(credential)
+                }
+
+                print("[EudiSsiApiImpl] Mapped to \(credentials.count) total credentials")
                 completion(.success(credentials))
             } catch {
                 print("[EudiSsiApiImpl] Failed to get credentials: \(error)")

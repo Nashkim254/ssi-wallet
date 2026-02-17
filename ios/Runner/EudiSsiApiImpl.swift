@@ -2,6 +2,7 @@ import EudiWalletKit
 import Flutter
 import Foundation
 import MdocDataModel18013
+import MdocDataTransfer18013
 import Security
 import WalletStorage
 
@@ -12,6 +13,9 @@ class EudiSsiApiImpl: NSObject, SsiApi {
     // Storage for DIDs and interactions (credentials managed by SDK)
     private var dids: [DidDto] = []
     private var interactions: [InteractionDto] = []
+
+    // Storage for pending presentation sessions
+    private var pendingSessions: [String: PresentationSession] = [:]
 
     // EUDI Wallet instance (will be initialized with real SDK)
     private var wallet: Any?  // Type will be: EudiWallet once SDK is imported
@@ -30,9 +34,25 @@ class EudiSsiApiImpl: NSObject, SsiApi {
                     authFlowRedirectionURI: URL(string: "eudi-openid4ci://authorize")!
                 )
 
+                // Load EUDI IACA trusted reader certificates from bundle
+                let certNames = [
+                    "pidissuerca02_ut", "pidissuerca02_eu", "pidissuerca02_cz",
+                    "pidissuerca02_ee", "pidissuerca02_lu", "pidissuerca02_nl",
+                    "pidissuerca02_pt", "r45_staging"
+                ]
+                var trustedCerts: [Data] = []
+                for name in certNames {
+                    if let url = Bundle.main.url(forResource: name, withExtension: "der"),
+                       let data = try? Data(contentsOf: url) {
+                        trustedCerts.append(data)
+                        print("[EudiSsiApiImpl] Loaded trusted cert: \(name).der (\(data.count) bytes)")
+                    }
+                }
+                print("[EudiSsiApiImpl] Loaded \(trustedCerts.count) trusted reader certificates")
+
                 let wallet = try EudiWallet(
                     serviceName: "com.example.ssi.eudi.wallet",
-                    trustedReaderCertificates: [],
+                    trustedReaderCertificates: trustedCerts,
                     userAuthenticationRequired: false,
                     openID4VciConfigurations: ["issuer": config]
                 )
@@ -75,7 +95,9 @@ class EudiSsiApiImpl: NSObject, SsiApi {
         Task {
             do {
                 print("[EudiSsiApiImpl] ========================================")
-                print("[EudiSsiApiImpl] createDid() called with method: \(method), keyType: \(keyType)")
+                print(
+                    "[EudiSsiApiImpl] createDid() called with method: \(method), keyType: \(keyType)"
+                )
 
                 guard isInitialized, let wallet = wallet as? EudiWallet else {
                     print("[EudiSsiApiImpl] Wallet not initialized, creating mock DID")
@@ -120,7 +142,10 @@ class EudiSsiApiImpl: NSObject, SsiApi {
                     keyType: keyType,
                     createdAt: ISO8601DateFormatter().string(from: Date()),
                     isDefault: isDefault,
-                    metadata: ["source": "manual", "sdk": true, "walletKeys": wallet.storage.docModels.count]
+                    metadata: [
+                        "source": "manual", "sdk": true,
+                        "walletKeys": wallet.storage.docModels.count,
+                    ]
                 )
 
                 dids.append(newDid)
@@ -154,7 +179,9 @@ class EudiSsiApiImpl: NSObject, SsiApi {
                 let deferredCount = wallet.storage.deferredDocuments.count
                 let totalCredentials = issuedDocs.count + pendingCount + deferredCount
 
-                print("[EudiSsiApiImpl] Found \(issuedDocs.count) issued, \(pendingCount) pending, \(deferredCount) deferred documents")
+                print(
+                    "[EudiSsiApiImpl] Found \(issuedDocs.count) issued, \(pendingCount) pending, \(deferredCount) deferred documents"
+                )
 
                 // Create a DID entry for the wallet's holder
                 // The EUDI SDK manages keys internally, we'll create a representative DID
@@ -165,7 +192,8 @@ class EudiSsiApiImpl: NSObject, SsiApi {
                     if !dids.contains(where: { $0.id == walletDidId }) {
                         let walletDid = DidDto(
                             id: walletDidId,
-                            didString: "did:key:z6Mk\(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(44))",
+                            didString:
+                                "did:key:z6Mk\(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(44))",
                             method: "did:key",
                             keyType: "Ed25519",
                             createdAt: ISO8601DateFormatter().string(from: Date()),
@@ -235,7 +263,9 @@ class EudiSsiApiImpl: NSObject, SsiApi {
                 let pendingDocs = wallet.storage.pendingDocuments
                 let deferredDocs = wallet.storage.deferredDocuments
 
-                print("[EudiSsiApiImpl] Found \(issuedDocs.count) issued, \(pendingDocs.count) pending, \(deferredDocs.count) deferred documents")
+                print(
+                    "[EudiSsiApiImpl] Found \(issuedDocs.count) issued, \(pendingDocs.count) pending, \(deferredDocs.count) deferred documents"
+                )
 
                 // Map issued documents
                 var credentials = issuedDocs.map { documentToCredentialDto($0) }
@@ -283,7 +313,33 @@ class EudiSsiApiImpl: NSObject, SsiApi {
         credentialId: String, completion: @escaping (Result<CredentialDto?, Error>) -> Void
     ) {
         Task {
-            // TODO: Implement with real SDK
+            guard let wallet = wallet as? EudiWallet else {
+                completion(.success(nil))
+                return
+            }
+
+            // Search in issued documents
+            if let doc = wallet.storage.docModels.first(where: { $0.id == credentialId }) {
+                completion(.success(documentToCredentialDto(doc)))
+                return
+            }
+
+            // Search in pending documents
+            if let doc = wallet.storage.pendingDocuments.first(where: { $0.id == credentialId }) {
+                let credential = CredentialDto(
+                    id: doc.id,
+                    name: doc.displayName ?? doc.docType ?? "Credential",
+                    type: doc.docType ?? "VerifiableCredential",
+                    format: doc.docDataFormat == .cbor ? "mso_mdoc" : "vc+sd-jwt",
+                    issuerName: "EUDI Issuer",
+                    issuedDate: ISO8601DateFormatter().string(from: doc.createdAt),
+                    claims: [:],
+                    state: "pending"
+                )
+                completion(.success(credential))
+                return
+            }
+
             completion(.success(nil))
         }
     }
@@ -327,19 +383,28 @@ class EudiSsiApiImpl: NSObject, SsiApi {
                     txCodeValue: nil
                 )
 
-                print("[EudiSsiApiImpl] Successfully issued \(issuedDocuments.count) documents")
+                print("[EudiSsiApiImpl] Returned \(issuedDocuments.count) documents")
+                for doc in issuedDocuments {
+                    print(
+                        "[EudiSsiApiImpl]   Doc id=\(doc.id), status=\(doc.status), docType=\(doc.docType ?? "nil"), authUrl=\(doc.authorizePresentationUrl ?? "nil")"
+                    )
+                }
 
                 // Check wallet storage immediately after issuance
                 let storedDocs = wallet.storage.docModels
-                print("[EudiSsiApiImpl] Wallet storage now has \(storedDocs.count) documents")
+                let pendingDocs = wallet.storage.pendingDocuments
+                let deferredDocs = wallet.storage.deferredDocuments
+                print(
+                    "[EudiSsiApiImpl] Storage: issued=\(storedDocs.count), pending=\(pendingDocs.count), deferred=\(deferredDocs.count)"
+                )
 
                 // Convert first issued document to CredentialDto
                 if let firstDoc = issuedDocuments.first {
                     let credential = CredentialDto(
                         id: firstDoc.id,
-                        name: firstDoc.docType ?? "Credential",
+                        name: firstDoc.displayName ?? firstDoc.docType ?? "Credential",
                         type: firstDoc.docType ?? "VerifiableCredential",
-                        format: "mso_mdoc",
+                        format: firstDoc.docDataFormat == .cbor ? "mso_mdoc" : "vc+sd-jwt",
                         issuerName: "EUDI Issuer",
                         issuedDate: ISO8601DateFormatter().string(from: firstDoc.createdAt),
                         claims: [:],
@@ -376,21 +441,175 @@ class EudiSsiApiImpl: NSObject, SsiApi {
     // MARK: - Presentation
 
     func processPresentationRequest(
-        url: String, completion: @escaping (Result<InteractionDto?, Error>) -> Void
+        url: String, completion: @escaping (Result<PresentationRequestDto?, Error>) -> Void
     ) {
         Task {
-            let interactionId = "interaction-\(UUID().uuidString)"
-            let interaction = InteractionDto(
-                id: interactionId,
-                type: "presentation_request",
-                verifierName: "Verifier",
-                requestedCredentials: ["VerifiableCredential"],
-                timestamp: ISO8601DateFormatter().string(from: Date()),
-                status: "pending",
-                completedAt: nil
-            )
-            interactions.append(interaction)
-            completion(.success(interaction))
+            do {
+                print("[EudiSsiApiImpl] ========================================")
+                print("[EudiSsiApiImpl] Processing OpenID4VP presentation request: \(url)")
+
+                guard isInitialized, let wallet = wallet as? EudiWallet else {
+                    print("[EudiSsiApiImpl] Wallet not initialized")
+                    throw NSError(
+                        domain: "EudiSsiApiImpl", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Wallet not initialized"])
+                }
+
+                // Convert URL string to Data for FlowType
+                guard let urlData = url.data(using: .utf8) else {
+                    throw NSError(
+                        domain: "EudiSsiApiImpl", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Invalid URL encoding"])
+                }
+
+                // Begin OpenID4VP presentation session
+                // Log wallet documents before starting
+                let docModels = wallet.storage.docModels
+                print("[EudiSsiApiImpl] Wallet docModels count: \(docModels.count)")
+                for doc in docModels {
+                    print(
+                        "[EudiSsiApiImpl]   Doc: id=\(doc.id), docType=\(doc.docType ?? "nil"), displayName=\(doc.displayName ?? "nil")"
+                    )
+                }
+                print("[EudiSsiApiImpl] Pending docs: \(wallet.storage.pendingDocuments.count)")
+                print("[EudiSsiApiImpl] Deferred docs: \(wallet.storage.deferredDocuments.count)")
+
+                print("[EudiSsiApiImpl] Creating presentation session...")
+                let session = await wallet.beginPresentation(
+                    flow: .openid4vp(qrCode: urlData),
+                    sessionTransactionLogger: nil
+                )
+
+                // Log session state after creation
+                print("[EudiSsiApiImpl] Session created. Status: \(session.status)")
+                print(
+                    "[EudiSsiApiImpl] DocIdToPresentInfo keys: \(session.docIdToPresentInfo?.keys.sorted() ?? [])"
+                )
+                if let presentInfo = session.docIdToPresentInfo {
+                    for (docId, info) in presentInfo {
+                        print(
+                            "[EudiSsiApiImpl]   PresentInfo: docId=\(docId), docType=\(info.docType), format=\(info.docDataFormat), displayName=\(info.displayName ?? "nil")"
+                        )
+                    }
+                }
+
+                // Receive the presentation request from verifier
+                print("[EudiSsiApiImpl] Receiving presentation request...")
+                guard let requestInfo = await session.receiveRequest() else {
+                    let errorMsg =
+                        session.uiError?.description ?? session.uiError?.errorDescription
+                        ?? "Unknown error"
+                    let docCount = wallet.storage.docModels.count
+                    let pendingCount = wallet.storage.pendingDocuments.count
+                    let deferredCount = wallet.storage.deferredDocuments.count
+                    let presentInfoCount = session.docIdToPresentInfo?.count ?? 0
+                    let detail =
+                        "SDK error: \(errorMsg) | docModels=\(docCount), pending=\(pendingCount), deferred=\(deferredCount), presentInfo=\(presentInfoCount)"
+                    print("[EudiSsiApiImpl] \(detail)")
+                    throw NSError(
+                        domain: "EudiSsiApiImpl", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: detail])
+                }
+
+                print("[EudiSsiApiImpl] Request received successfully")
+                print(
+                    "[EudiSsiApiImpl] Verifier: \(requestInfo.readerLegalName ?? requestInfo.readerCertificateIssuer ?? "Unknown")"
+                )
+                print(
+                    "[EudiSsiApiImpl] Disclosed documents count: \(session.disclosedDocuments.count)"
+                )
+
+                // Generate unique interaction ID
+                let interactionId = "interaction-\(UUID().uuidString)"
+
+                // Store session for later use in submission
+                pendingSessions[interactionId] = session
+
+                // Parse the request into our DTO format
+                let presentationRequest = try parsePresentationRequest(
+                    interactionId: interactionId,
+                    requestInfo: requestInfo,
+                    session: session
+                )
+
+                print("[EudiSsiApiImpl] Successfully parsed presentation request")
+                print("[EudiSsiApiImpl] Verifier: \(presentationRequest.verifierName)")
+                print(
+                    "[EudiSsiApiImpl] Requested claims: \(presentationRequest.requestedClaims.count)"
+                )
+                print(
+                    "[EudiSsiApiImpl] Matching credentials: \(presentationRequest.matchingCredentialIds.count)"
+                )
+
+                completion(.success(presentationRequest))
+            } catch {
+                print("[EudiSsiApiImpl] Failed to process presentation request: \(error)")
+                completion(.failure(error))
+            }
+        }
+    }
+
+    func submitPresentationWithClaims(
+        submission: PresentationSubmissionDto,
+        completion: @escaping (Result<Bool, Error>) -> Void
+    ) {
+        Task {
+            do {
+                print("[EudiSsiApiImpl] ========================================")
+                print(
+                    "[EudiSsiApiImpl] Submitting presentation for interaction: \(submission.interactionId)"
+                )
+                print("[EudiSsiApiImpl] Credential ID: \(submission.credentialId)")
+                print("[EudiSsiApiImpl] Selected claims: \(submission.selectedClaims)")
+
+                // Retrieve the stored presentation session
+                guard let session = pendingSessions[submission.interactionId] else {
+                    throw NSError(
+                        domain: "EudiSsiApiImpl", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Presentation session not found"])
+                }
+
+                // Build RequestItems from user's selected claims
+                let selectedClaimsNonNil = submission.selectedClaims.compactMap { $0 }
+                let itemsToSend = try buildRequestItems(
+                    from: session.disclosedDocuments,
+                    credentialId: submission.credentialId,
+                    selectedClaims: selectedClaimsNonNil
+                )
+
+                print("[EudiSsiApiImpl] Built request items for \(itemsToSend.count) documents")
+
+                // Send response to verifier via EUDI SDK
+                await session.sendResponse(
+                    userAccepted: true,
+                    itemsToSend: itemsToSend,
+                    onSuccess: { @Sendable redirectUrl in
+                        print("[EudiSsiApiImpl] Presentation response sent")
+                        if let url = redirectUrl {
+                            print("[EudiSsiApiImpl] Redirect URL: \(url)")
+                        }
+                    }
+                )
+
+                // Check if submission was successful
+                guard session.status == .responseSent else {
+                    throw NSError(
+                        domain: "EudiSsiApiImpl", code: -1,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: session.uiError?.description
+                                ?? "Failed to send response"
+                        ])
+                }
+
+                // Clean up
+                pendingSessions.removeValue(forKey: submission.interactionId)
+
+                print("[EudiSsiApiImpl] Presentation submitted successfully")
+                completion(.success(true))
+            } catch {
+                print("[EudiSsiApiImpl] Failed to submit presentation: \(error)")
+                completion(.failure(error))
+            }
         }
     }
 
@@ -399,6 +618,7 @@ class EudiSsiApiImpl: NSObject, SsiApi {
         completion: @escaping (Result<Bool, Error>) -> Void
     ) {
         Task {
+            // Legacy method - just mark as accepted for backward compatibility
             if let index = interactions.firstIndex(where: { $0.id == interactionId }) {
                 interactions[index].status = "accepted"
                 interactions[index].completedAt = ISO8601DateFormatter().string(from: Date())
@@ -413,6 +633,9 @@ class EudiSsiApiImpl: NSObject, SsiApi {
         interactionId: String, completion: @escaping (Result<Bool, Error>) -> Void
     ) {
         Task {
+            // Clean up pending presentation session
+            pendingSessions.removeValue(forKey: interactionId)
+
             if let index = interactions.firstIndex(where: { $0.id == interactionId }) {
                 interactions[index].status = "rejected"
                 interactions[index].completedAt = ISO8601DateFormatter().string(from: Date())
@@ -421,6 +644,115 @@ class EudiSsiApiImpl: NSObject, SsiApi {
                 completion(.success(false))
             }
         }
+    }
+
+    // MARK: - Presentation Helper Methods
+
+    /// Parse PresentationSession and UserRequestInfo into our PresentationRequestDto format
+    private func parsePresentationRequest(
+        interactionId: String,
+        requestInfo: UserRequestInfo,
+        session: PresentationSession
+    ) throws -> PresentationRequestDto {
+        // Extract verifier information
+        let verifierName =
+            requestInfo.readerLegalName ?? requestInfo.readerCertificateIssuer ?? "Unknown Verifier"
+        let verifierUrl = "openid4vp://"  // TODO: Extract actual URL if available
+
+        // Parse requested claims from all disclosed documents
+        var requestedClaims: [RequestedClaimDto] = []
+        var matchingCredentialIds: [String] = []
+        var intentToRetain: [String: Bool] = [:]
+
+        for docElement in session.disclosedDocuments {
+            // Add document ID to matching list
+            matchingCredentialIds.append(docElement.docId)
+
+            // Extract claims based on document type
+            switch docElement {
+            case .msoMdoc(let mdocElements):
+                // Parse mso_mdoc elements (ISO 18013-5 format)
+                for namespace in mdocElements.nameSpacedElements {
+                    for element in namespace.elements {
+                        let claim = RequestedClaimDto(
+                            claimName: element.elementIdentifier,
+                            claimPath: "\(namespace.nameSpace).\(element.elementIdentifier)",
+                            required: !element.isOptional,
+                            purpose: nil
+                        )
+                        requestedClaims.append(claim)
+                        intentToRetain[element.elementIdentifier] = element.intentToRetain
+                    }
+                }
+
+            case .sdJwt(let sdJwtElements):
+                // Parse SD-JWT elements (SD-JWT-VC format)
+                for sdItem in sdJwtElements.sdJwtElements {
+                    let claimName = sdItem.elementPath.joined(separator: ".")
+                    let claim = RequestedClaimDto(
+                        claimName: claimName,
+                        claimPath: claimName,
+                        required: !sdItem.isOptional,
+                        purpose: nil
+                    )
+                    requestedClaims.append(claim)
+                    intentToRetain[claimName] = sdItem.intentToRetain
+                }
+            }
+        }
+
+        // Intent-to-retain information extracted from SDK elements
+
+        return PresentationRequestDto(
+            interactionId: interactionId,
+            verifierName: verifierName,
+            verifierUrl: verifierUrl,
+            verifierLogo: nil,
+            requestedClaims: requestedClaims,
+            matchingCredentialIds: matchingCredentialIds,
+            intentToRetain: intentToRetain
+        )
+    }
+
+    /// Build RequestItems from user's selected claims
+    private func buildRequestItems(
+        from disclosedDocuments: [DocElements],
+        credentialId: String,
+        selectedClaims: [String]
+    ) throws -> RequestItems {
+        var requestItems: RequestItems = [:]
+
+        // Find the document that matches the credentialId
+        guard let selectedDoc = disclosedDocuments.first(where: { $0.docId == credentialId }) else {
+            throw NSError(
+                domain: "EudiSsiApiImpl", code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Document not found in session"])
+        }
+
+        // Use the SDK's built-in selection mechanism:
+        // Set isSelected on each element based on user's selectedClaims,
+        // then use selectedItemsDictionary to build properly formatted RequestItems
+        switch selectedDoc {
+        case .msoMdoc(let mdocElements):
+            for namespace in mdocElements.nameSpacedElements {
+                for element in namespace.elements {
+                    // Select if user chose this claim OR if it's required
+                    element.isSelected =
+                        selectedClaims.contains(element.elementIdentifier) || !element.isOptional
+                }
+            }
+            requestItems[credentialId] = mdocElements.selectedItemsDictionary
+
+        case .sdJwt(let sdJwtElements):
+            for sdItem in sdJwtElements.sdJwtElements {
+                let claimName = sdItem.elementPath.joined(separator: ".")
+                // Select if user chose this claim OR if it's required
+                sdItem.isSelected = selectedClaims.contains(claimName) || !sdItem.isOptional
+            }
+            requestItems[credentialId] = sdJwtElements.selectedItemsDictionary
+        }
+
+        return requestItems
     }
 
     func getInteractionHistory(completion: @escaping (Result<[InteractionDto], Error>) -> Void) {
@@ -542,14 +874,19 @@ class EudiSsiApiImpl: NSObject, SsiApi {
 
     private func documentToCredentialDto(_ document: DocClaimsDecodable) -> CredentialDto {
         let formatter = ISO8601DateFormatter()
+        // Extract claims from document
+        var claims: [String: String] = [:]
+        for claim in document.docClaims {
+            claims[claim.name] = claim.stringValue
+        }
         return CredentialDto(
             id: document.id,
-            name: document.docType ?? "Credential",
+            name: document.displayName ?? document.docType ?? "Credential",
             type: document.docType ?? "VerifiableCredential",
-            format: "mso_mdoc",
+            format: document.docDataFormat == .cbor ? "mso_mdoc" : "vc+sd-jwt",
             issuerName: document.issuerDisplay?.first?.name ?? "EUDI Issuer",
             issuedDate: formatter.string(from: document.createdAt),
-            claims: [:],
+            claims: claims,
             state: "valid"
         )
     }

@@ -19,6 +19,14 @@
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		F4DBF8C2DB522239020B3597 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62704C1D882A21C3B3E1EF86 /* Pods_Runner.framework */; };
 		F536640DE5D3398BF64FA838 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0D8216C2AF1BD33E8FE7FC95 /* Pods_RunnerTests.framework */; };
+		B1B2C3D4E5F60001000BLD01 /* pidissuerca02_cz.der in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60001000DER01 /* pidissuerca02_cz.der */; };
+		B1B2C3D4E5F60002000BLD02 /* pidissuerca02_ee.der in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60002000DER02 /* pidissuerca02_ee.der */; };
+		B1B2C3D4E5F60003000BLD03 /* pidissuerca02_eu.der in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60003000DER03 /* pidissuerca02_eu.der */; };
+		B1B2C3D4E5F60004000BLD04 /* pidissuerca02_lu.der in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60004000DER04 /* pidissuerca02_lu.der */; };
+		B1B2C3D4E5F60005000BLD05 /* pidissuerca02_nl.der in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60005000DER05 /* pidissuerca02_nl.der */; };
+		B1B2C3D4E5F60006000BLD06 /* pidissuerca02_pt.der in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60006000DER06 /* pidissuerca02_pt.der */; };
+		B1B2C3D4E5F60007000BLD07 /* pidissuerca02_ut.der in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60007000DER07 /* pidissuerca02_ut.der */; };
+		B1B2C3D4E5F60008000BLD08 /* r45_staging.der in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60008000DER08 /* r45_staging.der */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,6 +79,14 @@
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		97C147031CF9000F007C117E /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
 		B40E77018B008B89B7DDD690 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
+		A1B2C3D4E5F60001000DER01 /* pidissuerca02_cz.der */ = {isa = PBXFileReference; lastKnownFileType = file; path = pidissuerca02_cz.der; sourceTree = "<group>"; };
+		A1B2C3D4E5F60002000DER02 /* pidissuerca02_ee.der */ = {isa = PBXFileReference; lastKnownFileType = file; path = pidissuerca02_ee.der; sourceTree = "<group>"; };
+		A1B2C3D4E5F60003000DER03 /* pidissuerca02_eu.der */ = {isa = PBXFileReference; lastKnownFileType = file; path = pidissuerca02_eu.der; sourceTree = "<group>"; };
+		A1B2C3D4E5F60004000DER04 /* pidissuerca02_lu.der */ = {isa = PBXFileReference; lastKnownFileType = file; path = pidissuerca02_lu.der; sourceTree = "<group>"; };
+		A1B2C3D4E5F60005000DER05 /* pidissuerca02_nl.der */ = {isa = PBXFileReference; lastKnownFileType = file; path = pidissuerca02_nl.der; sourceTree = "<group>"; };
+		A1B2C3D4E5F60006000DER06 /* pidissuerca02_pt.der */ = {isa = PBXFileReference; lastKnownFileType = file; path = pidissuerca02_pt.der; sourceTree = "<group>"; };
+		A1B2C3D4E5F60007000DER07 /* pidissuerca02_ut.der */ = {isa = PBXFileReference; lastKnownFileType = file; path = pidissuerca02_ut.der; sourceTree = "<group>"; };
+		A1B2C3D4E5F60008000DER08 /* r45_staging.der */ = {isa = PBXFileReference; lastKnownFileType = file; path = r45_staging.der; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -134,9 +150,25 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		C1B2C3D4E5F6000100GRP01 /* Certificate */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F60001000DER01 /* pidissuerca02_cz.der */,
+				A1B2C3D4E5F60002000DER02 /* pidissuerca02_ee.der */,
+				A1B2C3D4E5F60003000DER03 /* pidissuerca02_eu.der */,
+				A1B2C3D4E5F60004000DER04 /* pidissuerca02_lu.der */,
+				A1B2C3D4E5F60005000DER05 /* pidissuerca02_nl.der */,
+				A1B2C3D4E5F60006000DER06 /* pidissuerca02_pt.der */,
+				A1B2C3D4E5F60007000DER07 /* pidissuerca02_ut.der */,
+				A1B2C3D4E5F60008000DER08 /* r45_staging.der */,
+			);
+			path = Certificate;
+			sourceTree = "<group>";
+		};
 		97C146F01CF9000F007C117D /* Runner */ = {
 			isa = PBXGroup;
 			children = (
+				C1B2C3D4E5F6000100GRP01 /* Certificate */,
 				97C146FA1CF9000F007C117D /* Main.storyboard */,
 				97C146FD1CF9000F007C117D /* Assets.xcassets */,
 				97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */,
@@ -277,6 +309,14 @@
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
+				B1B2C3D4E5F60001000BLD01 /* pidissuerca02_cz.der in Resources */,
+				B1B2C3D4E5F60002000BLD02 /* pidissuerca02_ee.der in Resources */,
+				B1B2C3D4E5F60003000BLD03 /* pidissuerca02_eu.der in Resources */,
+				B1B2C3D4E5F60004000BLD04 /* pidissuerca02_lu.der in Resources */,
+				B1B2C3D4E5F60005000BLD05 /* pidissuerca02_nl.der in Resources */,
+				B1B2C3D4E5F60006000BLD06 /* pidissuerca02_pt.der in Resources */,
+				B1B2C3D4E5F60007000BLD07 /* pidissuerca02_ut.der in Resources */,
+				B1B2C3D4E5F60008000BLD08 /* r45_staging.der in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -188,6 +188,105 @@ data class InteractionDto (
 }
 
 /**
+ * Requested claim details for presentation
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class RequestedClaimDto (
+  val claimName: String,
+  val claimPath: String,
+  val required: Boolean,
+  val purpose: String? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): RequestedClaimDto {
+      val claimName = pigeonVar_list[0] as String
+      val claimPath = pigeonVar_list[1] as String
+      val required = pigeonVar_list[2] as Boolean
+      val purpose = pigeonVar_list[3] as String?
+      return RequestedClaimDto(claimName, claimPath, required, purpose)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      claimName,
+      claimPath,
+      required,
+      purpose,
+    )
+  }
+}
+
+/**
+ * Presentation request details
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class PresentationRequestDto (
+  val interactionId: String,
+  val verifierName: String,
+  val verifierUrl: String,
+  val verifierLogo: String? = null,
+  val requestedClaims: List<RequestedClaimDto?>,
+  val matchingCredentialIds: List<String?>,
+  val intentToRetain: Map<String?, Boolean?>? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): PresentationRequestDto {
+      val interactionId = pigeonVar_list[0] as String
+      val verifierName = pigeonVar_list[1] as String
+      val verifierUrl = pigeonVar_list[2] as String
+      val verifierLogo = pigeonVar_list[3] as String?
+      val requestedClaims = pigeonVar_list[4] as List<RequestedClaimDto?>
+      val matchingCredentialIds = pigeonVar_list[5] as List<String?>
+      val intentToRetain = pigeonVar_list[6] as Map<String?, Boolean?>?
+      return PresentationRequestDto(interactionId, verifierName, verifierUrl, verifierLogo, requestedClaims, matchingCredentialIds, intentToRetain)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      interactionId,
+      verifierName,
+      verifierUrl,
+      verifierLogo,
+      requestedClaims,
+      matchingCredentialIds,
+      intentToRetain,
+    )
+  }
+}
+
+/**
+ * Presentation submission
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class PresentationSubmissionDto (
+  val interactionId: String,
+  val credentialId: String,
+  val selectedClaims: List<String?>
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): PresentationSubmissionDto {
+      val interactionId = pigeonVar_list[0] as String
+      val credentialId = pigeonVar_list[1] as String
+      val selectedClaims = pigeonVar_list[2] as List<String?>
+      return PresentationSubmissionDto(interactionId, credentialId, selectedClaims)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      interactionId,
+      credentialId,
+      selectedClaims,
+    )
+  }
+}
+
+/**
  * Result wrapper for operations
  *
  * Generated class from Pigeon that represents data sent in messages.
@@ -234,6 +333,21 @@ private open class SsiApiPigeonCodec : StandardMessageCodec() {
       }
       132.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
+          RequestedClaimDto.fromList(it)
+        }
+      }
+      133.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          PresentationRequestDto.fromList(it)
+        }
+      }
+      134.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          PresentationSubmissionDto.fromList(it)
+        }
+      }
+      135.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
           OperationResult.fromList(it)
         }
       }
@@ -254,8 +368,20 @@ private open class SsiApiPigeonCodec : StandardMessageCodec() {
         stream.write(131)
         writeValue(stream, value.toList())
       }
-      is OperationResult -> {
+      is RequestedClaimDto -> {
         stream.write(132)
+        writeValue(stream, value.toList())
+      }
+      is PresentationRequestDto -> {
+        stream.write(133)
+        writeValue(stream, value.toList())
+      }
+      is PresentationSubmissionDto -> {
+        stream.write(134)
+        writeValue(stream, value.toList())
+      }
+      is OperationResult -> {
+        stream.write(135)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -292,9 +418,11 @@ interface SsiApi {
   fun deleteCredential(credentialId: String, callback: (Result<Boolean>) -> Unit)
   /** Check credential status */
   fun checkCredentialStatus(credentialId: String, callback: (Result<String>) -> Unit)
-  /** Process a presentation request */
-  fun processPresentationRequest(url: String, callback: (Result<InteractionDto?>) -> Unit)
-  /** Submit a presentation */
+  /** Process a presentation request (returns detailed request info) */
+  fun processPresentationRequest(url: String, callback: (Result<PresentationRequestDto?>) -> Unit)
+  /** Submit a presentation with selected claims */
+  fun submitPresentationWithClaims(submission: PresentationSubmissionDto, callback: (Result<Boolean>) -> Unit)
+  /** Submit a presentation (legacy method - kept for compatibility) */
   fun submitPresentation(interactionId: String, credentialIds: List<String>, callback: (Result<Boolean>) -> Unit)
   /** Reject a presentation request */
   fun rejectPresentationRequest(interactionId: String, callback: (Result<Boolean>) -> Unit)
@@ -547,7 +675,27 @@ interface SsiApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val urlArg = args[0] as String
-            api.processPresentationRequest(urlArg) { result: Result<InteractionDto?> ->
+            api.processPresentationRequest(urlArg) { result: Result<PresentationRequestDto?> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.ssi.SsiApi.submitPresentationWithClaims$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val submissionArg = args[0] as PresentationSubmissionDto
+            api.submitPresentationWithClaims(submissionArg) { result: Result<Boolean> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(wrapError(error))

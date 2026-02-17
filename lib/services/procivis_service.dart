@@ -160,16 +160,41 @@ class ProcivisService {
   }
 
   /// Process a presentation request
-  Future<Map<String, dynamic>?> processPresentationRequest(String url) async {
+  Future<PresentationRequestDto?> processPresentationRequest(String url) async {
     try {
-      final interaction = await _api.processPresentationRequest(url);
-      if (interaction != null) {
-        return _interactionDtoToMap(interaction);
+      _logger.i('Processing presentation request: $url');
+      final request = await _api.processPresentationRequest(url);
+      if (request != null) {
+        _logger.i('Presentation request processed: ${request.verifierName}');
+        _logger.i('Matching credentials: ${request.matchingCredentialIds.length}');
       }
-      return null;
+      return request;
     } catch (e) {
       _logger.e('Failed to process presentation request: $e');
       return null;
+    }
+  }
+
+  /// Submit a presentation with selected claims
+  Future<bool> submitPresentationWithClaims(
+      PresentationSubmissionDto submission) async {
+    try {
+      _logger.i('Submitting presentation: ${submission.interactionId}');
+      _logger.i('Credential: ${submission.credentialId}');
+      _logger.i('Selected claims: ${submission.selectedClaims}');
+
+      final success = await _api.submitPresentationWithClaims(submission);
+
+      if (success) {
+        _logger.i('Presentation submitted successfully');
+      } else {
+        _logger.w('Presentation submission failed');
+      }
+
+      return success;
+    } catch (e) {
+      _logger.e('Failed to submit presentation: $e');
+      return false;
     }
   }
 

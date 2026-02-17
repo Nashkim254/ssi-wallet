@@ -90,6 +90,55 @@ class InteractionDto {
   final String? completedAt;
 }
 
+/// Requested claim details for presentation
+class RequestedClaimDto {
+  RequestedClaimDto({
+    required this.claimName,
+    required this.claimPath,
+    required this.required,
+    this.purpose,
+  });
+
+  final String claimName;
+  final String claimPath;
+  final bool required;
+  final String? purpose;
+}
+
+/// Presentation request details
+class PresentationRequestDto {
+  PresentationRequestDto({
+    required this.interactionId,
+    required this.verifierName,
+    required this.verifierUrl,
+    this.verifierLogo,
+    required this.requestedClaims,
+    required this.matchingCredentialIds,
+    this.intentToRetain,
+  });
+
+  final String interactionId;
+  final String verifierName;
+  final String verifierUrl;
+  final String? verifierLogo;
+  final List<RequestedClaimDto?> requestedClaims;
+  final List<String?> matchingCredentialIds;
+  final Map<String?, bool?>? intentToRetain;
+}
+
+/// Presentation submission
+class PresentationSubmissionDto {
+  PresentationSubmissionDto({
+    required this.interactionId,
+    required this.credentialId,
+    required this.selectedClaims,
+  });
+
+  final String interactionId;
+  final String credentialId;
+  final List<String?> selectedClaims;
+}
+
 /// Result wrapper for operations
 class OperationResult {
   OperationResult({
@@ -149,11 +198,15 @@ abstract class SsiApi {
   @async
   String checkCredentialStatus(String credentialId);
 
-  /// Process a presentation request
+  /// Process a presentation request (returns detailed request info)
   @async
-  InteractionDto? processPresentationRequest(String url);
+  PresentationRequestDto? processPresentationRequest(String url);
 
-  /// Submit a presentation
+  /// Submit a presentation with selected claims
+  @async
+  bool submitPresentationWithClaims(PresentationSubmissionDto submission);
+
+  /// Submit a presentation (legacy method - kept for compatibility)
   @async
   bool submitPresentation(String interactionId, List<String> credentialIds);
 

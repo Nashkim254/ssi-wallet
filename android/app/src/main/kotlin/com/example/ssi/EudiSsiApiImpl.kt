@@ -11,6 +11,8 @@ import eu.europa.ec.eudi.wallet.document.IssuedDocument
 import eu.europa.ec.eudi.wallet.issue.openid4vci.IssueEvent
 import eu.europa.ec.eudi.wallet.issue.openid4vci.OpenId4VciManager
 import eu.europa.ec.eudi.wallet.logging.Logger
+import eu.europa.ec.eudi.wallet.presentation.ClientIdScheme
+import eu.europa.ec.eudi.wallet.presentation.Format
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
@@ -46,6 +48,9 @@ class EudiSsiApiImpl(private val context: Context) : SsiApi {
     // In-memory storage for DIDs (EUDI wallet focuses on credentials/documents)
     private val dids = mutableListOf<DidDto>()
     private val interactions = mutableListOf<InteractionDto>()
+
+    // Storage for pending presentation requests
+    private val pendingPresentations = mutableMapOf<String, Any>()
 
     private var isInitialized = false
 
@@ -106,6 +111,36 @@ class EudiSsiApiImpl(private val context: Context) : SsiApi {
                         identifier = null
                     )
                     .configureLogging(level = Logger.LEVEL_DEBUG)
+                    .configureReaderTrustStore(
+                        context,
+                        R.raw.pidissuerca02_ut,
+                        R.raw.pidissuerca02_eu,
+                        R.raw.pidissuerca02_cz,
+                        R.raw.pidissuerca02_ee,
+                        R.raw.pidissuerca02_lu,
+                        R.raw.pidissuerca02_nl,
+                        R.raw.pidissuerca02_pt,
+                        R.raw.dc4eu,
+                        R.raw.r45_staging
+                    )
+                    .configureOpenId4Vp {
+                        withClientIdSchemes(
+                            ClientIdScheme.X509SanDns,
+                            ClientIdScheme.X509Hash
+                        )
+                        withSchemes(
+                            "openid4vp",
+                            "eudi-openid4vp",
+                            "mdoc-openid4vp",
+                            "haip-vp"
+                        )
+                        withFormats(
+                            Format.MsoMdoc.ES256,
+                            Format.SdJwtVc.ES256
+                        )
+                    }
+
+                Log.d(TAG, "Reader trust store and OpenID4VP configured")
 
                 // Initialize wallet
                 wallet = EudiWallet(context, config)
@@ -467,30 +502,103 @@ class EudiSsiApiImpl(private val context: Context) : SsiApi {
         }
     }
 
-    override fun processPresentationRequest(url: String, callback: (Result<InteractionDto?>) -> Unit) {
+    override fun processPresentationRequest(url: String, callback: (Result<PresentationRequestDto?>) -> Unit) {
         coroutineScope.launch {
             try {
-                val interactionId = "interaction-${java.util.UUID.randomUUID()}"
+                Log.d(TAG, "========================================")
+                Log.d(TAG, "Processing presentation request: $url")
 
-                // Parse the presentation request
-                // In EUDI wallet, this would be done via OpenId4VpManager
-                val interaction = InteractionDto(
-                    id = interactionId,
-                    type = "presentation_request",
-                    verifierName = "Verifier",
-                    requestedCredentials = listOf("VerifiableCredential"),
-                    timestamp = getCurrentISODateTime(),
-                    status = "pending",
-                    completedAt = null
-                )
+                if (wallet == null) {
+                    Log.e(TAG, "Wallet not initialized")
+                    throw IllegalStateException("Wallet not initialized")
+                }
 
-                interactions.add(interaction)
+                // Parse OpenID4VP request URI
+                val resolvedRequest = wallet!!.resolveRequestUri(url)
+
+                // Handle different request types
+                val presentationRequest = when (resolvedRequest) {
+                    is ResolvedRequestObject.OpenId4VPAuthorization -> {
+                        handleOpenId4VPRequest(resolvedRequest)
+                    }
+                    is ResolvedRequestObject.ProximityRequest -> {
+                        handleProximityRequest(resolvedRequest)
+                    }
+                    else -> {
+                        throw IllegalArgumentException("Unknown request type")
+                    }
+                }
+
+                Log.d(TAG, "Successfully parsed presentation request")
+                Log.d(TAG, "Verifier: ${presentationRequest.verifierName}")
+                Log.d(TAG, "Requested claims: ${presentationRequest.requestedClaims.size}")
+                Log.d(TAG, "Matching credentials: ${presentationRequest.matchingCredentialIds.size}")
 
                 withContext(Dispatchers.Main) {
-                    callback(Result.success(interaction))
+                    callback(Result.success(presentationRequest))
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to process presentation request", e)
+                withContext(Dispatchers.Main) {
+                    callback(Result.failure(e))
+                }
+            }
+        }
+    }
+
+    override fun submitPresentationWithClaims(
+        submission: PresentationSubmissionDto,
+        callback: (Result<Boolean>) -> Unit
+    ) {
+        coroutineScope.launch {
+            try {
+                Log.d(TAG, "========================================")
+                Log.d(TAG, "Submitting presentation for interaction: ${submission.interactionId}")
+                Log.d(TAG, "Credential ID: ${submission.credentialId}")
+                Log.d(TAG, "Selected claims: ${submission.selectedClaims}")
+
+                val request = pendingPresentations[submission.interactionId]
+                    ?: throw IllegalStateException("Presentation request not found")
+
+                val wallet = wallet ?: throw IllegalStateException("Wallet not initialized")
+
+                // Get all documents
+                val allDocs = wallet.getDocuments()
+
+                // Find the credential
+                val credential = allDocs.find { it.id == submission.credentialId }
+                    ?: throw IllegalArgumentException("Credential not found")
+
+                // Handle OpenID4VP request
+                when (request) {
+                    is ResolvedRequestObject.OpenId4VPAuthorization -> {
+                        sendOpenId4VPResponse(
+                            request = request,
+                            credential = credential,
+                            selectedClaims = submission.selectedClaims.filterNotNull(),
+                            wallet = wallet
+                        )
+                    }
+                    is ResolvedRequestObject.ProximityRequest -> {
+                        sendProximityResponse(
+                            request = request,
+                            credential = credential,
+                            selectedClaims = submission.selectedClaims.filterNotNull(),
+                            wallet = wallet
+                        )
+                    }
+                }
+
+                // Clean up
+                pendingPresentations.remove(submission.interactionId)
+
+                Log.d(TAG, "Presentation submitted successfully")
+
+                withContext(Dispatchers.Main) {
+                    callback(Result.success(true))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to submit presentation", e)
                 withContext(Dispatchers.Main) {
                     callback(Result.failure(e))
                 }
@@ -534,6 +642,9 @@ class EudiSsiApiImpl(private val context: Context) : SsiApi {
     override fun rejectPresentationRequest(interactionId: String, callback: (Result<Boolean>) -> Unit) {
         coroutineScope.launch {
             try {
+                // Clean up pending presentation
+                pendingPresentations.remove(interactionId)
+
                 val interaction = interactions.find { it.id == interactionId }
                 if (interaction != null) {
                     val index = interactions.indexOf(interaction)
@@ -557,6 +668,177 @@ class EudiSsiApiImpl(private val context: Context) : SsiApi {
                 }
             }
         }
+    }
+
+    // MARK: - Presentation Helper Methods
+
+    private suspend fun handleOpenId4VPRequest(request: ResolvedRequestObject.OpenId4VPAuthorization): PresentationRequestDto {
+        val wallet = wallet ?: throw IllegalStateException("Wallet not initialized")
+
+        // Extract verifier info
+        val verifierName = request.clientMetadata?.clientName ?: "Unknown Verifier"
+        val verifierUrl = request.clientId
+        val verifierLogo = request.clientMetadata?.logoUri
+
+        // Extract requested claims from presentation definition
+        val requestedClaims = mutableListOf<RequestedClaimDto>()
+        val intentToRetainMap = mutableMapOf<String, Boolean>()
+
+        request.presentationDefinition.inputDescriptors.forEach { descriptor ->
+            descriptor.constraints?.fields?.forEach { field ->
+                val claimName = extractClaimName(field.path)
+                val claim = RequestedClaimDto(
+                    claimName = claimName,
+                    claimPath = field.path.joinToString("."),
+                    required = !(field.optional ?: false),
+                    purpose = field.purpose
+                )
+                requestedClaims.add(claim)
+
+                // Check intent to retain
+                field.intentToRetain?.let { intentToRetain ->
+                    intentToRetainMap[claimName] = intentToRetain
+                }
+            }
+        }
+
+        // Find matching credentials
+        val allDocs = wallet.getDocuments()
+        val matchingDocs = allDocs.filter { doc ->
+            matchesPresentationDefinition(doc, request.presentationDefinition)
+        }
+
+        val matchingIds = matchingDocs.map { it.id }
+
+        // Generate interaction ID and store request
+        val interactionId = "interaction-${java.util.UUID.randomUUID()}"
+        pendingPresentations[interactionId] = request
+
+        return PresentationRequestDto(
+            interactionId = interactionId,
+            verifierName = verifierName,
+            verifierUrl = verifierUrl,
+            verifierLogo = verifierLogo,
+            requestedClaims = requestedClaims,
+            matchingCredentialIds = matchingIds,
+            intentToRetain = intentToRetainMap
+        )
+    }
+
+    private suspend fun handleProximityRequest(request: ResolvedRequestObject.ProximityRequest): PresentationRequestDto {
+        val wallet = wallet ?: throw IllegalStateException("Wallet not initialized")
+
+        // Extract requested claims from proximity request
+        val requestedClaims = mutableListOf<RequestedClaimDto>()
+
+        request.docRequest?.nameSpaces?.forEach { (namespace, elements) ->
+            elements.forEach { (elementId, _) ->
+                val claim = RequestedClaimDto(
+                    claimName = elementId,
+                    claimPath = "$namespace.$elementId",
+                    required = true,
+                    purpose = null
+                )
+                requestedClaims.add(claim)
+            }
+        }
+
+        // Find matching mDoc credentials
+        val allDocs = wallet.getDocuments()
+        val matchingDocs = allDocs.filter { doc ->
+            (doc as? IssuedDocument)?.docType == request.docRequest?.docType
+        }
+
+        val matchingIds = matchingDocs.map { it.id }
+
+        // Generate interaction ID and store request
+        val interactionId = "interaction-${java.util.UUID.randomUUID()}"
+        pendingPresentations[interactionId] = request
+
+        return PresentationRequestDto(
+            interactionId = interactionId,
+            verifierName = "Proximity Reader",
+            verifierUrl = "proximity://",
+            verifierLogo = null,
+            requestedClaims = requestedClaims,
+            matchingCredentialIds = matchingIds,
+            intentToRetain = null
+        )
+    }
+
+    private suspend fun sendOpenId4VPResponse(
+        request: ResolvedRequestObject.OpenId4VPAuthorization,
+        credential: IssuedDocument,
+        selectedClaims: List<String>,
+        wallet: EudiWallet
+    ) {
+        // Create disclosed document with selected claims
+        val disclosedDoc = DisclosedDocument(
+            document = credential,
+            disclosedClaims = selectedClaims
+        )
+
+        // Send response using EUDI SDK
+        wallet.sendResponse(
+            resolvedRequest = request,
+            disclosedDocuments = listOf(disclosedDoc)
+        )
+
+        Log.d(TAG, "OpenID4VP response sent successfully")
+    }
+
+    private suspend fun sendProximityResponse(
+        request: ResolvedRequestObject.ProximityRequest,
+        credential: IssuedDocument,
+        selectedClaims: List<String>,
+        wallet: EudiWallet
+    ) {
+        // Create disclosed document with selected claims
+        val disclosedDoc = DisclosedDocument(
+            document = credential,
+            disclosedClaims = selectedClaims
+        )
+
+        // Send proximity response using EUDI SDK
+        wallet.sendProximityResponse(
+            request = request,
+            document = credential,
+            disclosedFields = selectedClaims
+        )
+
+        Log.d(TAG, "Proximity response sent successfully")
+    }
+
+    private fun extractClaimName(path: List<String>): String {
+        // Extract claim name from JSON path
+        // e.g., ["$.age_over_18"] -> "age_over_18"
+        // e.g., ["$.credentialSubject.given_name"] -> "given_name"
+        val lastComponent = path.lastOrNull() ?: return "unknown"
+
+        val components = lastComponent.split(".")
+        return components.lastOrNull()?.replace("$", "") ?: "unknown"
+    }
+
+    private fun matchesPresentationDefinition(doc: IssuedDocument, definition: PresentationDefinition): Boolean {
+        // Check if document matches presentation definition
+        // For now, simplified matching based on docType
+        val docType = doc.docType
+
+        // Check if any input descriptor matches this doc type
+        definition.inputDescriptors.forEach { descriptor ->
+            descriptor.format?.let { format ->
+                // Match mso_mdoc format
+                if (format.containsKey("mso_mdoc")) {
+                    return true
+                }
+                // Match vc+sd-jwt format
+                if (format.containsKey("vc+sd-jwt")) {
+                    return true
+                }
+            }
+        }
+
+        return false
     }
 
     override fun getInteractionHistory(callback: (Result<List<InteractionDto>>) -> Unit) {

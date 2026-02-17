@@ -230,6 +230,116 @@ struct InteractionDto {
   }
 }
 
+/// Requested claim details for presentation
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct RequestedClaimDto {
+  var claimName: String
+  var claimPath: String
+  var required: Bool
+  var purpose: String? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> RequestedClaimDto? {
+    let claimName = pigeonVar_list[0] as! String
+    let claimPath = pigeonVar_list[1] as! String
+    let required = pigeonVar_list[2] as! Bool
+    let purpose: String? = nilOrValue(pigeonVar_list[3])
+
+    return RequestedClaimDto(
+      claimName: claimName,
+      claimPath: claimPath,
+      required: required,
+      purpose: purpose
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      claimName,
+      claimPath,
+      required,
+      purpose,
+    ]
+  }
+}
+
+/// Presentation request details
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct PresentationRequestDto {
+  var interactionId: String
+  var verifierName: String
+  var verifierUrl: String
+  var verifierLogo: String? = nil
+  var requestedClaims: [RequestedClaimDto?]
+  var matchingCredentialIds: [String?]
+  var intentToRetain: [String?: Bool?]? = nil
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> PresentationRequestDto? {
+    let interactionId = pigeonVar_list[0] as! String
+    let verifierName = pigeonVar_list[1] as! String
+    let verifierUrl = pigeonVar_list[2] as! String
+    let verifierLogo: String? = nilOrValue(pigeonVar_list[3])
+    let requestedClaims = pigeonVar_list[4] as! [RequestedClaimDto?]
+    let matchingCredentialIds = pigeonVar_list[5] as! [String?]
+    let intentToRetain: [String?: Bool?]? = nilOrValue(pigeonVar_list[6])
+
+    return PresentationRequestDto(
+      interactionId: interactionId,
+      verifierName: verifierName,
+      verifierUrl: verifierUrl,
+      verifierLogo: verifierLogo,
+      requestedClaims: requestedClaims,
+      matchingCredentialIds: matchingCredentialIds,
+      intentToRetain: intentToRetain
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      interactionId,
+      verifierName,
+      verifierUrl,
+      verifierLogo,
+      requestedClaims,
+      matchingCredentialIds,
+      intentToRetain,
+    ]
+  }
+}
+
+/// Presentation submission
+///
+/// Generated class from Pigeon that represents data sent in messages.
+struct PresentationSubmissionDto {
+  var interactionId: String
+  var credentialId: String
+  var selectedClaims: [String?]
+
+
+  // swift-format-ignore: AlwaysUseLowerCamelCase
+  static func fromList(_ pigeonVar_list: [Any?]) -> PresentationSubmissionDto? {
+    let interactionId = pigeonVar_list[0] as! String
+    let credentialId = pigeonVar_list[1] as! String
+    let selectedClaims = pigeonVar_list[2] as! [String?]
+
+    return PresentationSubmissionDto(
+      interactionId: interactionId,
+      credentialId: credentialId,
+      selectedClaims: selectedClaims
+    )
+  }
+  func toList() -> [Any?] {
+    return [
+      interactionId,
+      credentialId,
+      selectedClaims,
+    ]
+  }
+}
+
 /// Result wrapper for operations
 ///
 /// Generated class from Pigeon that represents data sent in messages.
@@ -270,6 +380,12 @@ private class SsiApiPigeonCodecReader: FlutterStandardReader {
     case 131:
       return InteractionDto.fromList(self.readValue() as! [Any?])
     case 132:
+      return RequestedClaimDto.fromList(self.readValue() as! [Any?])
+    case 133:
+      return PresentationRequestDto.fromList(self.readValue() as! [Any?])
+    case 134:
+      return PresentationSubmissionDto.fromList(self.readValue() as! [Any?])
+    case 135:
       return OperationResult.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
@@ -288,8 +404,17 @@ private class SsiApiPigeonCodecWriter: FlutterStandardWriter {
     } else if let value = value as? InteractionDto {
       super.writeByte(131)
       super.writeValue(value.toList())
-    } else if let value = value as? OperationResult {
+    } else if let value = value as? RequestedClaimDto {
       super.writeByte(132)
+      super.writeValue(value.toList())
+    } else if let value = value as? PresentationRequestDto {
+      super.writeByte(133)
+      super.writeValue(value.toList())
+    } else if let value = value as? PresentationSubmissionDto {
+      super.writeByte(134)
+      super.writeValue(value.toList())
+    } else if let value = value as? OperationResult {
+      super.writeByte(135)
       super.writeValue(value.toList())
     } else {
       super.writeValue(value)
@@ -338,9 +463,11 @@ protocol SsiApi {
   func deleteCredential(credentialId: String, completion: @escaping (Result<Bool, Error>) -> Void)
   /// Check credential status
   func checkCredentialStatus(credentialId: String, completion: @escaping (Result<String, Error>) -> Void)
-  /// Process a presentation request
-  func processPresentationRequest(url: String, completion: @escaping (Result<InteractionDto?, Error>) -> Void)
-  /// Submit a presentation
+  /// Process a presentation request (returns detailed request info)
+  func processPresentationRequest(url: String, completion: @escaping (Result<PresentationRequestDto?, Error>) -> Void)
+  /// Submit a presentation with selected claims
+  func submitPresentationWithClaims(submission: PresentationSubmissionDto, completion: @escaping (Result<Bool, Error>) -> Void)
+  /// Submit a presentation (legacy method - kept for compatibility)
   func submitPresentation(interactionId: String, credentialIds: [String], completion: @escaping (Result<Bool, Error>) -> Void)
   /// Reject a presentation request
   func rejectPresentationRequest(interactionId: String, completion: @escaping (Result<Bool, Error>) -> Void)
@@ -560,7 +687,7 @@ class SsiApiSetup {
     } else {
       checkCredentialStatusChannel.setMessageHandler(nil)
     }
-    /// Process a presentation request
+    /// Process a presentation request (returns detailed request info)
     let processPresentationRequestChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.ssi.SsiApi.processPresentationRequest\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       processPresentationRequestChannel.setMessageHandler { message, reply in
@@ -578,7 +705,25 @@ class SsiApiSetup {
     } else {
       processPresentationRequestChannel.setMessageHandler(nil)
     }
-    /// Submit a presentation
+    /// Submit a presentation with selected claims
+    let submitPresentationWithClaimsChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.ssi.SsiApi.submitPresentationWithClaims\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      submitPresentationWithClaimsChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let submissionArg = args[0] as! PresentationSubmissionDto
+        api.submitPresentationWithClaims(submission: submissionArg) { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      submitPresentationWithClaimsChannel.setMessageHandler(nil)
+    }
+    /// Submit a presentation (legacy method - kept for compatibility)
     let submitPresentationChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.ssi.SsiApi.submitPresentation\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       submitPresentationChannel.setMessageHandler { message, reply in

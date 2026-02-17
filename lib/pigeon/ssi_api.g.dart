@@ -206,6 +206,127 @@ class InteractionDto {
   }
 }
 
+/// Requested claim details for presentation
+class RequestedClaimDto {
+  RequestedClaimDto({
+    required this.claimName,
+    required this.claimPath,
+    required this.required,
+    this.purpose,
+  });
+
+  String claimName;
+
+  String claimPath;
+
+  bool required;
+
+  String? purpose;
+
+  Object encode() {
+    return <Object?>[
+      claimName,
+      claimPath,
+      required,
+      purpose,
+    ];
+  }
+
+  static RequestedClaimDto decode(Object result) {
+    result as List<Object?>;
+    return RequestedClaimDto(
+      claimName: result[0]! as String,
+      claimPath: result[1]! as String,
+      required: result[2]! as bool,
+      purpose: result[3] as String?,
+    );
+  }
+}
+
+/// Presentation request details
+class PresentationRequestDto {
+  PresentationRequestDto({
+    required this.interactionId,
+    required this.verifierName,
+    required this.verifierUrl,
+    this.verifierLogo,
+    required this.requestedClaims,
+    required this.matchingCredentialIds,
+    this.intentToRetain,
+  });
+
+  String interactionId;
+
+  String verifierName;
+
+  String verifierUrl;
+
+  String? verifierLogo;
+
+  List<RequestedClaimDto?> requestedClaims;
+
+  List<String?> matchingCredentialIds;
+
+  Map<String?, bool?>? intentToRetain;
+
+  Object encode() {
+    return <Object?>[
+      interactionId,
+      verifierName,
+      verifierUrl,
+      verifierLogo,
+      requestedClaims,
+      matchingCredentialIds,
+      intentToRetain,
+    ];
+  }
+
+  static PresentationRequestDto decode(Object result) {
+    result as List<Object?>;
+    return PresentationRequestDto(
+      interactionId: result[0]! as String,
+      verifierName: result[1]! as String,
+      verifierUrl: result[2]! as String,
+      verifierLogo: result[3] as String?,
+      requestedClaims: (result[4] as List<Object?>?)!.cast<RequestedClaimDto?>(),
+      matchingCredentialIds: (result[5] as List<Object?>?)!.cast<String?>(),
+      intentToRetain: (result[6] as Map<Object?, Object?>?)?.cast<String?, bool?>(),
+    );
+  }
+}
+
+/// Presentation submission
+class PresentationSubmissionDto {
+  PresentationSubmissionDto({
+    required this.interactionId,
+    required this.credentialId,
+    required this.selectedClaims,
+  });
+
+  String interactionId;
+
+  String credentialId;
+
+  List<String?> selectedClaims;
+
+  Object encode() {
+    return <Object?>[
+      interactionId,
+      credentialId,
+      selectedClaims,
+    ];
+  }
+
+  static PresentationSubmissionDto decode(Object result) {
+    result as List<Object?>;
+    return PresentationSubmissionDto(
+      interactionId: result[0]! as String,
+      credentialId: result[1]! as String,
+      selectedClaims: (result[2] as List<Object?>?)!.cast<String?>(),
+    );
+  }
+}
+
 /// Result wrapper for operations
 class OperationResult {
   OperationResult({
@@ -255,8 +376,17 @@ class _PigeonCodec extends StandardMessageCodec {
     }    else if (value is InteractionDto) {
       buffer.putUint8(131);
       writeValue(buffer, value.encode());
-    }    else if (value is OperationResult) {
+    }    else if (value is RequestedClaimDto) {
       buffer.putUint8(132);
+      writeValue(buffer, value.encode());
+    }    else if (value is PresentationRequestDto) {
+      buffer.putUint8(133);
+      writeValue(buffer, value.encode());
+    }    else if (value is PresentationSubmissionDto) {
+      buffer.putUint8(134);
+      writeValue(buffer, value.encode());
+    }    else if (value is OperationResult) {
+      buffer.putUint8(135);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -273,6 +403,12 @@ class _PigeonCodec extends StandardMessageCodec {
       case 131: 
         return InteractionDto.decode(readValue(buffer)!);
       case 132: 
+        return RequestedClaimDto.decode(readValue(buffer)!);
+      case 133: 
+        return PresentationRequestDto.decode(readValue(buffer)!);
+      case 134: 
+        return PresentationSubmissionDto.decode(readValue(buffer)!);
+      case 135: 
         return OperationResult.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -582,8 +718,8 @@ class SsiApi {
     }
   }
 
-  /// Process a presentation request
-  Future<InteractionDto?> processPresentationRequest(String url) async {
+  /// Process a presentation request (returns detailed request info)
+  Future<PresentationRequestDto?> processPresentationRequest(String url) async {
     final String pigeonVar_channelName = 'dev.flutter.pigeon.ssi.SsiApi.processPresentationRequest$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
@@ -601,11 +737,39 @@ class SsiApi {
         details: pigeonVar_replyList[2],
       );
     } else {
-      return (pigeonVar_replyList[0] as InteractionDto?);
+      return (pigeonVar_replyList[0] as PresentationRequestDto?);
     }
   }
 
-  /// Submit a presentation
+  /// Submit a presentation with selected claims
+  Future<bool> submitPresentationWithClaims(PresentationSubmissionDto submission) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.ssi.SsiApi.submitPresentationWithClaims$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[submission]) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as bool?)!;
+    }
+  }
+
+  /// Submit a presentation (legacy method - kept for compatibility)
   Future<bool> submitPresentation(String interactionId, List<String> credentialIds) async {
     final String pigeonVar_channelName = 'dev.flutter.pigeon.ssi.SsiApi.submitPresentation$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(

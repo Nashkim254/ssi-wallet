@@ -3,6 +3,10 @@ import 'package:ssi/app/app.locator.dart';
 import 'package:ssi/services/credential_service.dart';
 import 'package:ssi/services/procivis_service.dart';
 import 'package:ssi/services/qr_scanner_service.dart';
+import 'package:ssi/ui/models/credential.dart';
+import 'package:ssi/ui/models/presentation_request.dart';
+import 'package:ssi/ui/views/credential_selection/credential_selection_view.dart';
+import 'package:ssi/ui/views/presentation_consent/presentation_consent_view.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
@@ -133,37 +137,91 @@ class ScanViewModel extends BaseViewModel {
     notifyListeners();
 
     try {
-      final result =
+      // Process presentation request
+      final requestDto =
           await _procivisService.processPresentationRequest(requestUrl);
 
-      if (result != null) {
-        // Show credential selection dialog
-        final response = await _dialogService.showDialog(
-          title: 'Share Credentials',
-          description:
-              'A verifier is requesting your credentials. Would you like to proceed?',
-          buttonTitle: 'Share',
-          cancelTitle: 'Decline',
-        );
-
-        if (response?.confirmed == true) {
-          // In a real implementation, show credential selection
-          // For now, just navigate back
-          _snackbarService.showSnackbar(
-            message: 'Credentials shared successfully!',
-            duration: const Duration(seconds: 3),
-          );
-          navigateBack();
-        } else {
-          // Reject the request
-          await _procivisService.rejectPresentationRequest(
-            result['interactionId'] as String,
-          );
-          navigateBack();
-        }
-      } else {
+      if (requestDto == null) {
         await _showError('Failed', 'Could not process presentation request');
+        return;
       }
+
+      final request = PresentationRequest.fromDto(requestDto);
+
+      // Check if we have matching credentials
+      if (request.matchingCredentialIds.isEmpty) {
+        await _showError(
+          'No Matching Credentials',
+          'You don\'t have the required credentials to fulfill this request.',
+        );
+        return;
+      }
+
+      // Get matching credentials
+      final matchingCredentialFutures = request.matchingCredentialIds
+          .map((id) => _credentialService.getCredential(id));
+
+      final matchingCredentials =
+          (await Future.wait(matchingCredentialFutures))
+              .whereType<Credential>()
+              .toList();
+
+      if (matchingCredentials.isEmpty) {
+        await _showError(
+          'No Matching Credentials',
+          'Could not load the required credentials.',
+        );
+        return;
+      }
+
+      // Navigate to credential selection
+      final selectedCredential = await _navigationService.navigateWithTransition(
+        CredentialSelectionView(
+          request: request,
+          matchingCredentials: matchingCredentials,
+        ),
+      );
+
+      if (selectedCredential == null) {
+        // User cancelled
+        await _procivisService.rejectPresentationRequest(request.interactionId);
+        return;
+      }
+
+      // Navigate to consent screen
+      final selectedClaims = await _navigationService.navigateWithTransition(
+        PresentationConsentView(
+          request: request,
+          selectedCredential: selectedCredential,
+        ),
+      );
+
+      if (selectedClaims == null || selectedClaims is! List<String>) {
+        // User declined
+        await _procivisService.rejectPresentationRequest(request.interactionId);
+        return;
+      }
+
+      // Submit presentation
+      final submission = PresentationSubmission(
+        interactionId: request.interactionId,
+        credentialId: selectedCredential.id,
+        selectedClaims: selectedClaims,
+      );
+
+      final success =
+          await _procivisService.submitPresentationWithClaims(submission.toDto());
+
+      if (success) {
+        _snackbarService.showSnackbar(
+          message: 'Credentials shared successfully!',
+          duration: const Duration(seconds: 3),
+        );
+      } else {
+        await _showError('Failed', 'Could not share credentials');
+      }
+
+      navigateBack();
     } catch (e) {
       await _showError('Error', 'Failed to process request: $e');
     }

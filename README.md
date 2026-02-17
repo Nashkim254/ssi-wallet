@@ -2,10 +2,11 @@
 
 ## 📚 Table of Contents
 1. [Complete API Flow - Credential Issuance](#complete-api-flow)
-2. [Protocol Drafts & Versions](#protocol-drafts)
-3. [Credential Formats (mDoc, SD-JWT, JWT-VC)](#credential-formats)
-4. [Mobile SDK Architecture](#mobile-sdk-architecture)
-5. [Complete Code Examples](#code-examples)
+2. [Complete API Flow - Credential Verification](#credential-verification-flow)
+3. [Protocol Drafts & Versions](#protocol-drafts)
+4. [Credential Formats (mDoc, SD-JWT, JWT-VC)](#credential-formats)
+5. [Mobile SDK Architecture](#mobile-sdk-architecture)
+6. [Complete Code Examples](#code-examples)
 
 ---
 
@@ -566,7 +567,486 @@ documents.forEach { doc ->
 
 ---
 
-# 2. Protocol Drafts & Versions
+# 2. Complete API Flow - Credential Verification (Implementation)
+
+## The Verification Journey Overview
+
+### Overview Sequence
+```
+User → Scan QR → Wallet App → EUDI SDK → Verifier Server → User Consent → VP Token → Verified
+  (1 scan)    (parse URL)   (resolve)   (fetch request)   (select claims) (submit)  (done)
+```
+
+### Prerequisites
+- Wallet initialized with EUDI SDK (iOS v0.19.4 / Android v0.23.0)
+- At least one credential issued and stored (e.g., mDL via OpenID4VCI)
+- IACA trusted reader certificates bundled in app (for verifier certificate chain validation)
+- EUDI Reference Verifier: `https://verifier.eudiw.dev`
+
+---
+
+## Phase 1: Configuration & Trust Setup
+
+Before any verification can happen, the wallet must be configured with trusted reader certificates
+and OpenID4VP settings. Without these, the SDK will reject verifier requests with
+"Could not trust certificate chain".
+
+### iOS Configuration
+
+```swift
+// Load EUDI IACA trusted reader certificates from bundle (.der format)
+let certNames = [
+    "pidissuerca02_ut", "pidissuerca02_eu", "pidissuerca02_cz",
+    "pidissuerca02_ee", "pidissuerca02_lu", "pidissuerca02_nl",
+    "pidissuerca02_pt", "r45_staging"
+]
+var trustedCerts: [Data] = []
+for name in certNames {
+    if let url = Bundle.main.url(forResource: name, withExtension: "der"),
+       let data = try? Data(contentsOf: url) {
+        trustedCerts.append(data)
+    }
+}
+
+let wallet = try EudiWallet(
+    serviceName: "com.example.ssi.eudi.wallet",
+    trustedReaderCertificates: trustedCerts,  // Critical for verification
+    userAuthenticationRequired: false,
+    openID4VciConfigurations: ["issuer": config]
+)
+```
+
+**Certificate files location:** `ios/Runner/Certificate/*.der`
+**Source:** Downloaded from [eudi-app-ios-wallet-ui](https://github.com/eu-digital-identity-wallet/eudi-app-ios-wallet-ui) reference app
+
+### Android Configuration
+
+```kotlin
+val config = EudiWalletConfig()
+    .configureDocumentManager(
+        storagePath = storageFile.absolutePath,
+        identifier = null
+    )
+    .configureLogging(level = Logger.LEVEL_DEBUG)
+    .configureReaderTrustStore(
+        context,
+        R.raw.pidissuerca02_ut, R.raw.pidissuerca02_eu,
+        R.raw.pidissuerca02_cz, R.raw.pidissuerca02_ee,
+        R.raw.pidissuerca02_lu, R.raw.pidissuerca02_nl,
+        R.raw.pidissuerca02_pt, R.raw.dc4eu, R.raw.r45_staging
+    )
+    .configureOpenId4Vp {
+        withClientIdSchemes(
+            ClientIdScheme.X509SanDns,
+            ClientIdScheme.X509Hash
+        )
+        withSchemes(
+            "openid4vp", "eudi-openid4vp",
+            "mdoc-openid4vp", "haip-vp"
+        )
+        withFormats(
+            Format.MsoMdoc.ES256,
+            Format.SdJwtVc.ES256
+        )
+    }
+
+wallet = EudiWallet(context, config)
+```
+
+**Certificate files location:** `android/app/src/main/res/raw/*.pem`
+**Source:** Downloaded from [eudi-app-android-wallet-ui](https://github.com/eu-digital-identity-wallet/eudi-app-android-wallet-ui) reference app
+
+### IACA Certificates Bundled
+
+| Certificate | Country/Region | Format (iOS/Android) |
+|-------------|---------------|---------------------|
+| pidissuerca02_ut | Test/Dev | .der / .pem |
+| pidissuerca02_eu | EU | .der / .pem |
+| pidissuerca02_cz | Czech Republic | .der / .pem |
+| pidissuerca02_ee | Estonia | .der / .pem |
+| pidissuerca02_lu | Luxembourg | .der / .pem |
+| pidissuerca02_nl | Netherlands | .der / .pem |
+| pidissuerca02_pt | Portugal | .der / .pem |
+| r45_staging | Staging | .der / .pem |
+| dc4eu | DC4EU (Android only) | - / .pem |
+
+---
+
+## Phase 2: Initiate Presentation (Scan QR Code)
+
+### Step 1: User Scans Verifier QR Code
+
+The EUDI Reference Verifier (`https://verifier.eudiw.dev`) generates QR codes containing
+OpenID4VP authorization request URIs.
+
+**QR Code Content (example):**
+```
+eudi-openid4vp://authorize?client_id=...&request_uri=https://verifier.eudiw.dev/wallet/request.jwt/...
+```
+
+**Supported URI Schemes:**
+- `openid4vp://` - Standard OpenID4VP
+- `eudi-openid4vp://` - EUDI-specific scheme
+- `mdoc-openid4vp://` - mDoc-specific scheme
+- `haip-vp://` - HAIP VP scheme
+
+### Step 2: Flutter Layer Receives URL
+
+The Flutter QR scanner captures the URL and passes it to the native layer via Pigeon:
+
+```dart
+// Flutter scan_viewmodel.dart
+final presentationRequest = await _ssiApi.processPresentationRequest(scannedUrl);
+```
+
+---
+
+## Phase 3: Process Presentation Request (Native SDK)
+
+### iOS Implementation
+
+```swift
+func processPresentationRequest(url: String, completion: @escaping (Result<PresentationRequestDto?, Error>) -> Void) {
+    Task {
+        guard let wallet = wallet as? EudiWallet else { throw ... }
+        guard let urlData = url.data(using: .utf8) else { throw ... }
+
+        // Step 1: Begin presentation session with OpenID4VP flow
+        let session = await wallet.beginPresentation(
+            flow: .openid4vp(qrCode: urlData),
+            sessionTransactionLogger: nil
+        )
+
+        // Step 2: Receive and parse the verifier's request
+        // SDK fetches request_uri, validates verifier certificate chain,
+        // and matches requested claims against stored credentials
+        guard let requestInfo = await session.receiveRequest() else {
+            // Common errors:
+            // - "Could not trust certificate chain" → missing IACA certs
+            // - "Claim not found: ..." → verifier requested claims not in credential
+            throw NSError(domain: "EudiSsiApiImpl", code: -1,
+                userInfo: [NSLocalizedDescriptionKey: session.uiError?.description ?? "Unknown error"])
+        }
+
+        // Step 3: Parse disclosed documents into app's DTO format
+        // session.disclosedDocuments contains matched credentials with requested elements
+        for docElement in session.disclosedDocuments {
+            switch docElement {
+            case .msoMdoc(let mdocElements):
+                // Parse mso_mdoc elements (ISO 18013-5 namespace format)
+                for namespace in mdocElements.nameSpacedElements {
+                    for element in namespace.elements {
+                        // element.elementIdentifier = "family_name", "given_name", etc.
+                        // element.isOptional = whether the verifier marked it optional
+                        // element.intentToRetain = whether verifier intends to store the data
+                    }
+                }
+            case .sdJwt(let sdJwtElements):
+                // Parse SD-JWT elements
+                for sdItem in sdJwtElements.sdJwtElements {
+                    // sdItem.elementPath = ["family_name"] etc.
+                }
+            }
+        }
+
+        // Step 4: Store session for later submission
+        pendingSessions[interactionId] = session
+
+        // Return parsed request to Flutter for UI display
+        completion(.success(presentationRequest))
+    }
+}
+```
+
+**Key iOS SDK Types:**
+- `PresentationSession` - Manages the full presentation lifecycle
+- `UserRequestInfo` - Contains verifier identity (legal name, certificate issuer)
+- `DocElements` - Enum with `.msoMdoc` and `.sdJwt` cases
+- `FlowType.openid4vp(qrCode: Data)` - Initiates OpenID4VP flow
+
+### Android Implementation
+
+```kotlin
+override fun processPresentationRequest(url: String, callback: (Result<PresentationRequestDto?>) -> Unit) {
+    coroutineScope.launch {
+        // Step 1: Resolve the OpenID4VP request URI
+        val resolvedRequest = wallet!!.resolveRequestUri(url)
+
+        when (resolvedRequest) {
+            is ResolvedRequestObject.OpenId4VPAuthorization -> {
+                // Step 2: Extract verifier info and requested claims
+                val verifierName = resolvedRequest.clientMetadata?.clientName ?: "Unknown Verifier"
+
+                // Step 3: Parse presentation definition for requested claims
+                resolvedRequest.presentationDefinition.inputDescriptors.forEach { descriptor ->
+                    descriptor.constraints?.fields?.forEach { field ->
+                        // field.path = ["$.family_name"], ["$.age_over_18"], etc.
+                        // field.optional = whether verifier considers this optional
+                        // field.intentToRetain = whether verifier intends to store data
+                    }
+                }
+
+                // Step 4: Match credentials against request
+                val allDocs = wallet.getDocuments()
+                val matchingDocs = allDocs.filter { doc ->
+                    matchesPresentationDefinition(doc, resolvedRequest.presentationDefinition)
+                }
+
+                // Store request for later submission
+                pendingPresentations[interactionId] = resolvedRequest
+
+                callback(Result.success(presentationRequest))
+            }
+        }
+    }
+}
+```
+
+### What the SDK Does Internally
+
+When `beginPresentation()` (iOS) or `resolveRequestUri()` (Android) is called:
+
+1. **Parse URI** - Extract `client_id` and `request_uri` from the QR code URL
+2. **Fetch Request Object** - `GET {request_uri}` to retrieve the signed JWT request
+3. **Validate Verifier Certificate** - Check X.509 certificate chain against bundled IACA certs
+4. **Parse Presentation Definition** - Extract requested claims, formats, and constraints
+5. **Match Credentials** - Find stored documents that satisfy the request
+6. **Return Results** - Provide matched documents with selectable claim elements
+
+---
+
+## Phase 4: User Consent & Claim Selection
+
+### Flutter UI Flow
+
+```dart
+// scan_viewmodel.dart - After receiving PresentationRequestDto
+// 1. Fetch full credential details for each matching ID
+final credentials = await Future.wait(
+    presentationRequest.matchingCredentialIds.map((id) =>
+        _ssiApi.getCredential(id)  // Must return real data, not null!
+    )
+);
+
+// 2. Show consent screen with:
+//    - Verifier name and trust info
+//    - List of requested claims (with required/optional marking)
+//    - Intent-to-retain information
+//    - Matching credential details
+
+// 3. User selects which claims to share and approves
+```
+
+**Critical Implementation Note:** The `getCredential(id)` method must return real credential data.
+A stub returning `null` causes the UI to show "No Matching Credentials" even when the SDK
+found matches. This was a key bug we fixed:
+
+```swift
+// iOS - Real getCredential implementation
+func getCredential(credentialId: String, completion: @escaping (Result<CredentialDto?, Error>) -> Void) {
+    Task {
+        guard let wallet = wallet as? EudiWallet else {
+            completion(.success(nil))
+            return
+        }
+
+        // Search in issued documents
+        if let doc = wallet.storage.docModels.first(where: { $0.id == credentialId }) {
+            completion(.success(documentToCredentialDto(doc)))
+            return
+        }
+
+        // Search in pending documents
+        if let doc = wallet.storage.pendingDocuments.first(where: { $0.id == credentialId }) {
+            // Return pending credential DTO
+            completion(.success(...))
+            return
+        }
+
+        completion(.success(nil))
+    }
+}
+```
+
+```kotlin
+// Android - Real getCredential implementation
+override fun getCredential(credentialId: String, callback: (Result<CredentialDto?>) -> Unit) {
+    coroutineScope.launch {
+        val document = wallet?.getDocumentById(credentialId)
+        val credential = when (document) {
+            is IssuedDocument -> documentToCredentialDto(document)
+            else -> null
+        }
+        withContext(Dispatchers.Main) { callback(Result.success(credential)) }
+    }
+}
+```
+
+---
+
+## Phase 5: Submit Presentation Response
+
+### iOS - Submit with Selected Claims
+
+```swift
+func submitPresentationWithClaims(
+    submission: PresentationSubmissionDto,
+    completion: @escaping (Result<Bool, Error>) -> Void
+) {
+    Task {
+        // Retrieve the stored presentation session
+        guard let session = pendingSessions[submission.interactionId] else { throw ... }
+
+        // Build RequestItems from user's selected claims
+        // The SDK uses isSelected flags on each element
+        guard let selectedDoc = session.disclosedDocuments.first(
+            where: { $0.docId == submission.credentialId }
+        ) else { throw ... }
+
+        switch selectedDoc {
+        case .msoMdoc(let mdocElements):
+            for namespace in mdocElements.nameSpacedElements {
+                for element in namespace.elements {
+                    // Select if user chose this claim OR if it's required
+                    element.isSelected = selectedClaims.contains(element.elementIdentifier)
+                        || !element.isOptional
+                }
+            }
+            requestItems[credentialId] = mdocElements.selectedItemsDictionary
+
+        case .sdJwt(let sdJwtElements):
+            for sdItem in sdJwtElements.sdJwtElements {
+                let claimName = sdItem.elementPath.joined(separator: ".")
+                sdItem.isSelected = selectedClaims.contains(claimName)
+                    || !sdItem.isOptional
+            }
+            requestItems[credentialId] = sdJwtElements.selectedItemsDictionary
+        }
+
+        // Send response to verifier via EUDI SDK
+        await session.sendResponse(
+            userAccepted: true,
+            itemsToSend: requestItems,
+            onSuccess: { @Sendable redirectUrl in
+                print("Presentation response sent")
+            }
+        )
+
+        // Verify submission succeeded
+        guard session.status == .responseSent else { throw ... }
+
+        // Clean up
+        pendingSessions.removeValue(forKey: submission.interactionId)
+        completion(.success(true))
+    }
+}
+```
+
+### Android - Submit with Selected Claims
+
+```kotlin
+override fun submitPresentationWithClaims(
+    submission: PresentationSubmissionDto,
+    callback: (Result<Boolean>) -> Unit
+) {
+    coroutineScope.launch {
+        val request = pendingPresentations[submission.interactionId]
+            ?: throw IllegalStateException("Presentation request not found")
+
+        val credential = wallet!!.getDocuments()
+            .find { it.id == submission.credentialId }
+            ?: throw IllegalArgumentException("Credential not found")
+
+        when (request) {
+            is ResolvedRequestObject.OpenId4VPAuthorization -> {
+                val disclosedDoc = DisclosedDocument(
+                    document = credential,
+                    disclosedClaims = submission.selectedClaims.filterNotNull()
+                )
+
+                wallet!!.sendResponse(
+                    resolvedRequest = request,
+                    disclosedDocuments = listOf(disclosedDoc)
+                )
+            }
+        }
+
+        pendingPresentations.remove(submission.interactionId)
+        callback(Result.success(true))
+    }
+}
+```
+
+### What the SDK Does During Submission
+
+1. **Build VP Token** - Creates Verifiable Presentation token with selective disclosure
+   - For mDoc: CBOR-encoded DeviceResponse with only selected IssuerSignedItems
+   - For SD-JWT: Issuer JWT + selected Disclosures + Key Binding JWT
+2. **Sign with Device Key** - Proves credential possession with device-bound key
+3. **POST to Verifier** - Sends VP token + presentation_submission to verifier's `response_uri`
+4. **Receive Result** - Gets success/redirect response from verifier
+
+---
+
+## Phase 6: Complete Flow Diagram (Implementation)
+
+```
+┌──────────┐     ┌───────────┐     ┌────────────┐     ┌────────────┐
+│  User    │     │  Flutter  │     │ Native SDK │     │  Verifier  │
+│          │     │  (Dart)   │     │ (iOS/And)  │     │  Server    │
+└────┬─────┘     └─────┬─────┘     └──────┬─────┘     └──────┬─────┘
+     │                 │                   │                   │
+     │ 1. Scan QR      │                   │                   │
+     │────────────────>│                   │                   │
+     │                 │                   │                   │
+     │                 │ 2. processPres    │                   │
+     │                 │   entationReq()   │                   │
+     │                 │──────────────────>│                   │
+     │                 │                   │                   │
+     │                 │                   │ 3. beginPresent() │
+     │                 │                   │   /resolveReq()   │
+     │                 │                   │──────────────────>│
+     │                 │                   │                   │
+     │                 │                   │ 4. Fetch request  │
+     │                 │                   │   + validate cert │
+     │                 │                   │<──────────────────│
+     │                 │                   │                   │
+     │                 │ 5. PresentationRe │                   │
+     │                 │   questDto        │                   │
+     │                 │<──────────────────│                   │
+     │                 │                   │                   │
+     │                 │ 6. getCredential()│                   │
+     │                 │──────────────────>│                   │
+     │                 │<──────────────────│                   │
+     │                 │                   │                   │
+     │ 7. Show consent │                   │                   │
+     │   screen        │                   │                   │
+     │<────────────────│                   │                   │
+     │                 │                   │                   │
+     │ 8. User approves│                   │                   │
+     │────────────────>│                   │                   │
+     │                 │                   │                   │
+     │                 │ 9. submitPresenta │                   │
+     │                 │   tionWithClaims()│                   │
+     │                 │──────────────────>│                   │
+     │                 │                   │                   │
+     │                 │                   │ 10. sendResponse()│
+     │                 │                   │   (VP Token)      │
+     │                 │                   │──────────────────>│
+     │                 │                   │                   │
+     │                 │                   │ 11. Success/      │
+     │                 │                   │   Redirect        │
+     │                 │                   │<──────────────────│
+     │                 │                   │                   │
+     │                 │ 12. true          │                   │
+     │                 │<──────────────────│                   │
+     │                 │                   │                   │
+     │ 13. Show success│                   │                   │
+     │<────────────────│                   │                   │
+```
+
+
+# 3. Protocol Drafts & Versions
 
 ## OpenID4VCI Specification Evolution
 

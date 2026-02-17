@@ -17,6 +17,9 @@ class EudiSsiApiImpl: NSObject, SsiApi {
     // Storage for pending presentation sessions
     private var pendingSessions: [String: PresentationSession] = [:]
 
+    // BLE proximity presentation session
+    private var proximitySession: PresentationSession?
+
     // EUDI Wallet instance (will be initialized with real SDK)
     private var wallet: Any?  // Type will be: EudiWallet once SDK is imported
     private var isInitialized = false
@@ -850,6 +853,96 @@ class EudiSsiApiImpl: NSObject, SsiApi {
                 See EudiSsiApiImpl.swift for detailed integration instructions.
                 """
             completion(.success(logs))
+        }
+    }
+
+    // MARK: - BLE Proximity Presentation
+
+    func startProximityPresentation(completion: @escaping (Result<String, Error>) -> Void) {
+        Task {
+            do {
+                print("[EudiSsiApiImpl] Starting BLE proximity presentation...")
+
+                guard isInitialized, let wallet = wallet as? EudiWallet else {
+                    throw NSError(
+                        domain: "EudiSsiApiImpl", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Wallet not initialized"])
+                }
+
+                // Begin a BLE presentation session
+                let session = await wallet.beginPresentation(
+                    flow: .ble,
+                    sessionTransactionLogger: nil
+                )
+
+                self.proximitySession = session
+
+                // Start QR engagement — generates the device engagement data
+                try await session.startQrEngagement()
+
+                guard let qrString = session.deviceEngagement else {
+                    throw NSError(
+                        domain: "EudiSsiApiImpl", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Failed to generate QR engagement"])
+                }
+
+                print("[EudiSsiApiImpl] BLE proximity QR engagement generated (\(qrString.count) chars)")
+                completion(.success(qrString))
+            } catch {
+                print("[EudiSsiApiImpl] Failed to start proximity presentation: \(error)")
+                completion(.failure(error))
+            }
+        }
+    }
+
+    func receiveProximityRequest(completion: @escaping (Result<PresentationRequestDto?, Error>) -> Void) {
+        Task {
+            do {
+                print("[EudiSsiApiImpl] Waiting for BLE proximity request from verifier...")
+
+                guard let session = proximitySession else {
+                    throw NSError(
+                        domain: "EudiSsiApiImpl", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "No proximity session active"])
+                }
+
+                // Block until a verifier connects via BLE and sends a request
+                guard let requestInfo = await session.receiveRequest() else {
+                    let errorMsg = session.uiError?.description ?? session.uiError?.errorDescription ?? "Unknown error"
+                    print("[EudiSsiApiImpl] Proximity request failed: \(errorMsg)")
+                    throw NSError(
+                        domain: "EudiSsiApiImpl", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Proximity request failed: \(errorMsg)"])
+                }
+
+                print("[EudiSsiApiImpl] Proximity request received from verifier")
+
+                // Generate interaction ID and store session for submission
+                let interactionId = "proximity-\(UUID().uuidString)"
+                pendingSessions[interactionId] = session
+
+                // Parse the request using existing helper
+                let presentationRequest = try parsePresentationRequest(
+                    interactionId: interactionId,
+                    requestInfo: requestInfo,
+                    session: session
+                )
+
+                print("[EudiSsiApiImpl] Proximity request parsed: \(presentationRequest.verifierName), \(presentationRequest.requestedClaims.count) claims")
+                completion(.success(presentationRequest))
+            } catch {
+                print("[EudiSsiApiImpl] Failed to receive proximity request: \(error)")
+                completion(.failure(error))
+            }
+        }
+    }
+
+    func stopProximityPresentation(completion: @escaping (Result<Bool, Error>) -> Void) {
+        Task {
+            print("[EudiSsiApiImpl] Stopping BLE proximity presentation...")
+            proximitySession = nil
+            print("[EudiSsiApiImpl] Proximity session cleaned up")
+            completion(.success(true))
         }
     }
 

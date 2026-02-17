@@ -10,6 +10,7 @@ import 'package:flutter/material.dart' as _i5;
 import 'package:local_auth/local_auth.dart' as _i11;
 import 'package:mockito/mockito.dart' as _i1;
 import 'package:mockito/src/dummies.dart' as _i4;
+import 'package:ssi/pigeon/ssi_api.g.dart' as _i17;
 import 'package:ssi/services/biometric_service.dart' as _i10;
 import 'package:ssi/services/credential_service.dart' as _i14;
 import 'package:ssi/services/did_service.dart' as _i12;
@@ -1202,6 +1203,16 @@ class MockQrScannerService extends _i1.Mock implements _i2.QrScannerService {
       ) as _i6.Future<bool>);
 
   @override
+  _i6.Future<void> openSettings() => (super.noSuchMethod(
+        Invocation.method(
+          #openSettings,
+          [],
+        ),
+        returnValue: _i6.Future<void>.value(),
+        returnValueForMissingStub: _i6.Future<void>.value(),
+      ) as _i6.Future<void>);
+
+  @override
   _i6.Future<_i2.QrScanResult> processScanResult(String? data) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -1512,15 +1523,29 @@ class MockProcivisService extends _i1.Mock implements _i16.ProcivisService {
       ) as _i6.Future<Map<String, dynamic>?>);
 
   @override
-  _i6.Future<Map<String, dynamic>?> processPresentationRequest(String? url) =>
+  _i6.Future<_i17.PresentationRequestDto?> processPresentationRequest(
+          String? url) =>
       (super.noSuchMethod(
         Invocation.method(
           #processPresentationRequest,
           [url],
         ),
-        returnValue: _i6.Future<Map<String, dynamic>?>.value(),
-        returnValueForMissingStub: _i6.Future<Map<String, dynamic>?>.value(),
-      ) as _i6.Future<Map<String, dynamic>?>);
+        returnValue: _i6.Future<_i17.PresentationRequestDto?>.value(),
+        returnValueForMissingStub:
+            _i6.Future<_i17.PresentationRequestDto?>.value(),
+      ) as _i6.Future<_i17.PresentationRequestDto?>);
+
+  @override
+  _i6.Future<bool> submitPresentationWithClaims(
+          _i17.PresentationSubmissionDto? submission) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #submitPresentationWithClaims,
+          [submission],
+        ),
+        returnValue: _i6.Future<bool>.value(false),
+        returnValueForMissingStub: _i6.Future<bool>.value(false),
+      ) as _i6.Future<bool>);
 
   @override
   _i6.Future<bool> submitPresentation(

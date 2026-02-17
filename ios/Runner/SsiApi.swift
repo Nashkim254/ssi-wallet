@@ -489,6 +489,14 @@ protocol SsiApi {
   /// Get debug logs from the native SDK
   /// Returns the last 1000 lines of logs for debugging
   func getDebugLogs(completion: @escaping (Result<String, Error>) -> Void)
+  /// Start BLE proximity presentation (ISO 18013-5)
+  /// Returns a QR code string containing device engagement data for the verifier to scan
+  func startProximityPresentation(completion: @escaping (Result<String, Error>) -> Void)
+  /// Wait for a verifier to connect via BLE and send a presentation request
+  /// Blocks until the verifier connects and sends its request
+  func receiveProximityRequest(completion: @escaping (Result<PresentationRequestDto?, Error>) -> Void)
+  /// Stop the proximity presentation session and clean up BLE resources
+  func stopProximityPresentation(completion: @escaping (Result<Bool, Error>) -> Void)
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -893,6 +901,56 @@ class SsiApiSetup {
       }
     } else {
       getDebugLogsChannel.setMessageHandler(nil)
+    }
+    /// Start BLE proximity presentation (ISO 18013-5)
+    /// Returns a QR code string containing device engagement data for the verifier to scan
+    let startProximityPresentationChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.ssi.SsiApi.startProximityPresentation\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      startProximityPresentationChannel.setMessageHandler { _, reply in
+        api.startProximityPresentation { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      startProximityPresentationChannel.setMessageHandler(nil)
+    }
+    /// Wait for a verifier to connect via BLE and send a presentation request
+    /// Blocks until the verifier connects and sends its request
+    let receiveProximityRequestChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.ssi.SsiApi.receiveProximityRequest\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      receiveProximityRequestChannel.setMessageHandler { _, reply in
+        api.receiveProximityRequest { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      receiveProximityRequestChannel.setMessageHandler(nil)
+    }
+    /// Stop the proximity presentation session and clean up BLE resources
+    let stopProximityPresentationChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.ssi.SsiApi.stopProximityPresentation\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      stopProximityPresentationChannel.setMessageHandler { _, reply in
+        api.stopProximityPresentation { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      stopProximityPresentationChannel.setMessageHandler(nil)
     }
   }
 }

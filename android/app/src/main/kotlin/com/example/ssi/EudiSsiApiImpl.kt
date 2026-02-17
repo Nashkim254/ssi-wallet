@@ -13,6 +13,8 @@ import eu.europa.ec.eudi.wallet.issue.openid4vci.OpenId4VciManager
 import eu.europa.ec.eudi.wallet.logging.Logger
 import eu.europa.ec.eudi.wallet.presentation.ClientIdScheme
 import eu.europa.ec.eudi.wallet.presentation.Format
+import eu.europa.ec.eudi.wallet.transfer.TransferEvent
+import eu.europa.ec.eudi.wallet.transfer.TransferManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
@@ -51,6 +53,11 @@ class EudiSsiApiImpl(private val context: Context) : SsiApi {
 
     // Storage for pending presentation requests
     private val pendingPresentations = mutableMapOf<String, Any>()
+
+    // BLE proximity presentation state
+    private var proximityTransferListener: TransferEvent.Listener? = null
+    private var proximityQrDeferred: CompletableDeferred<String>? = null
+    private var proximityRequestDeferred: CompletableDeferred<ResolvedRequestObject.ProximityRequest>? = null
 
     private var isInitialized = false
 
@@ -800,10 +807,9 @@ class EudiSsiApiImpl(private val context: Context) : SsiApi {
         )
 
         // Send proximity response using EUDI SDK
-        wallet.sendProximityResponse(
-            request = request,
-            document = credential,
-            disclosedFields = selectedClaims
+        wallet.sendResponse(
+            resolvedRequest = request,
+            disclosedDocuments = listOf(disclosedDoc)
         )
 
         Log.d(TAG, "Proximity response sent successfully")
@@ -927,6 +933,148 @@ class EudiSsiApiImpl(private val context: Context) : SsiApi {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to uninitialize", e)
+                withContext(Dispatchers.Main) {
+                    callback(Result.success(false))
+                }
+            }
+        }
+    }
+
+    // MARK: - BLE Proximity Presentation
+
+    override fun startProximityPresentation(callback: (Result<String>) -> Unit) {
+        coroutineScope.launch {
+            try {
+                Log.d(TAG, "Starting BLE proximity presentation...")
+
+                val eudiWallet = wallet
+                    ?: throw IllegalStateException("Wallet not initialized")
+
+                val qrDeferred = CompletableDeferred<String>()
+                proximityQrDeferred = qrDeferred
+
+                // Create a transfer event listener to capture the QR engagement
+                val listener = TransferEvent.Listener { event ->
+                    Log.d(TAG, "Proximity TransferEvent: ${event.javaClass.simpleName}")
+                    when (event) {
+                        is TransferEvent.QrEngagementReady -> {
+                            Log.d(TAG, "QR engagement ready")
+                            qrDeferred.complete(event.qrCode.content)
+                        }
+                        is TransferEvent.RequestReceived -> {
+                            Log.d(TAG, "Proximity request received from verifier")
+                            try {
+                                val resolvedRequest = eudiWallet.resolveRequestUri(event.processedRequest.toString())
+                                if (resolvedRequest is ResolvedRequestObject.ProximityRequest) {
+                                    proximityRequestDeferred?.complete(resolvedRequest)
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to resolve proximity request", e)
+                                proximityRequestDeferred?.completeExceptionally(e)
+                            }
+                        }
+                        is TransferEvent.Error -> {
+                            Log.e(TAG, "Proximity transfer error: ${event.error}")
+                            if (!qrDeferred.isCompleted) {
+                                qrDeferred.completeExceptionally(
+                                    Exception("BLE transfer error: ${event.error}")
+                                )
+                            }
+                            proximityRequestDeferred?.completeExceptionally(
+                                Exception("BLE transfer error: ${event.error}")
+                            )
+                        }
+                        is TransferEvent.Disconnected -> {
+                            Log.d(TAG, "Proximity session disconnected")
+                        }
+                        else -> {
+                            Log.d(TAG, "Unhandled proximity event: ${event.javaClass.simpleName}")
+                        }
+                    }
+                }
+
+                proximityTransferListener = listener
+                eudiWallet.addTransferEventListener(listener)
+
+                // Start BLE proximity presentation — SDK begins BLE advertising
+                eudiWallet.startProximityPresentation()
+
+                // Wait for QR engagement to be ready
+                val qrContent = qrDeferred.await()
+
+                Log.d(TAG, "BLE proximity QR engagement generated (${qrContent.length} chars)")
+
+                withContext(Dispatchers.Main) {
+                    callback(Result.success(qrContent))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start proximity presentation", e)
+                withContext(Dispatchers.Main) {
+                    callback(Result.failure(e))
+                }
+            }
+        }
+    }
+
+    override fun receiveProximityRequest(callback: (Result<PresentationRequestDto?>) -> Unit) {
+        coroutineScope.launch {
+            try {
+                Log.d(TAG, "Waiting for BLE proximity request from verifier...")
+
+                val eudiWallet = wallet
+                    ?: throw IllegalStateException("Wallet not initialized")
+
+                val requestDeferred = CompletableDeferred<ResolvedRequestObject.ProximityRequest>()
+                proximityRequestDeferred = requestDeferred
+
+                // Block until the verifier connects via BLE and sends a request
+                val request = requestDeferred.await()
+
+                Log.d(TAG, "Proximity request received, parsing...")
+
+                // Parse and store the request
+                val presentationRequest = handleProximityRequest(request)
+
+                Log.d(TAG, "Proximity request parsed: ${presentationRequest.verifierName}")
+
+                withContext(Dispatchers.Main) {
+                    callback(Result.success(presentationRequest))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to receive proximity request", e)
+                withContext(Dispatchers.Main) {
+                    callback(Result.failure(e))
+                }
+            }
+        }
+    }
+
+    override fun stopProximityPresentation(callback: (Result<Boolean>) -> Unit) {
+        coroutineScope.launch {
+            try {
+                Log.d(TAG, "Stopping BLE proximity presentation...")
+
+                val eudiWallet = wallet
+                if (eudiWallet != null) {
+                    // Remove the transfer event listener
+                    proximityTransferListener?.let {
+                        eudiWallet.removeTransferEventListener(it)
+                    }
+                    eudiWallet.stopProximityPresentation()
+                }
+
+                // Clean up state
+                proximityTransferListener = null
+                proximityQrDeferred = null
+                proximityRequestDeferred = null
+
+                Log.d(TAG, "Proximity session cleaned up")
+
+                withContext(Dispatchers.Main) {
+                    callback(Result.success(true))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to stop proximity presentation", e)
                 withContext(Dispatchers.Main) {
                     callback(Result.success(false))
                 }

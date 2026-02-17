@@ -448,6 +448,18 @@ interface SsiApi {
    * Returns the last 1000 lines of logs for debugging
    */
   fun getDebugLogs(callback: (Result<String>) -> Unit)
+  /**
+   * Start BLE proximity presentation (ISO 18013-5)
+   * Returns a QR code string containing device engagement data for the verifier to scan
+   */
+  fun startProximityPresentation(callback: (Result<String>) -> Unit)
+  /**
+   * Wait for a verifier to connect via BLE and send a presentation request
+   * Blocks until the verifier connects and sends its request
+   */
+  fun receiveProximityRequest(callback: (Result<PresentationRequestDto?>) -> Unit)
+  /** Stop the proximity presentation session and clean up BLE resources */
+  fun stopProximityPresentation(callback: (Result<Boolean>) -> Unit)
 
   companion object {
     /** The codec used by SsiApi. */
@@ -885,6 +897,60 @@ interface SsiApi {
         if (api != null) {
           channel.setMessageHandler { _, reply ->
             api.getDebugLogs{ result: Result<String> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.ssi.SsiApi.startProximityPresentation$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.startProximityPresentation{ result: Result<String> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.ssi.SsiApi.receiveProximityRequest$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.receiveProximityRequest{ result: Result<PresentationRequestDto?> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.ssi.SsiApi.stopProximityPresentation$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.stopProximityPresentation{ result: Result<Boolean> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(wrapError(error))

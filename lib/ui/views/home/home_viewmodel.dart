@@ -6,6 +6,7 @@ import 'package:ssi/services/credential_service.dart';
 import 'package:ssi/services/did_service.dart';
 import 'package:ssi/ui/models/credential.dart';
 import 'package:ssi/ui/views/debug/debug_view.dart';
+import 'package:ssi/ui/views/proximity/proximity_view.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
@@ -95,6 +96,12 @@ class HomeViewModel extends BaseViewModel {
     _navigationService.navigateWithTransition(
       const DebugView(),
       transition: 'fade',
+    );
+  }
+
+  void navigateToProximity() {
+    _navigationService.navigateWithTransition(
+      const ProximityView(),
     );
   }
 }

@@ -5,7 +5,7 @@
 // **************************************************************************
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-import 'package:flutter/material.dart' as _i14;
+import 'package:flutter/material.dart' as _i15;
 import 'package:flutter/material.dart';
 import 'package:ssi/ui/views/activity/activity_view.dart' as _i13;
 import 'package:ssi/ui/views/backup/backup_view.dart' as _i12;
@@ -15,13 +15,14 @@ import 'package:ssi/ui/views/credentials/credentials_view.dart' as _i6;
 import 'package:ssi/ui/views/did_management/did_management_view.dart' as _i10;
 import 'package:ssi/ui/views/home/home_view.dart' as _i2;
 import 'package:ssi/ui/views/onboarding/onboarding_view.dart' as _i5;
+import 'package:ssi/ui/views/proximity/proximity_view.dart' as _i14;
 import 'package:ssi/ui/views/scan/scan_view.dart' as _i8;
 import 'package:ssi/ui/views/security/security_view.dart' as _i11;
 import 'package:ssi/ui/views/settings/settings_view.dart' as _i7;
 import 'package:ssi/ui/views/splash/splash_view.dart' as _i4;
 import 'package:ssi/ui/views/startup/startup_view.dart' as _i3;
 import 'package:stacked/stacked.dart' as _i1;
-import 'package:stacked_services/stacked_services.dart' as _i15;
+import 'package:stacked_services/stacked_services.dart' as _i16;
 
 class Routes {
   static const homeView = '/home-view';
@@ -48,6 +49,8 @@ class Routes {
 
   static const activityView = '/activity-view';
 
+  static const proximityView = '/proximity-view';
+
   static const all = <String>{
     homeView,
     startupView,
@@ -61,6 +64,7 @@ class Routes {
     securityView,
     backupView,
     activityView,
+    proximityView,
   };
 }
 
@@ -114,80 +118,90 @@ class StackedRouter extends _i1.RouterBase {
       Routes.activityView,
       page: _i13.ActivityView,
     ),
+    _i1.RouteDef(
+      Routes.proximityView,
+      page: _i14.ProximityView,
+    ),
   ];
 
   final _pagesMap = <Type, _i1.StackedRouteFactory>{
     _i2.HomeView: (data) {
-      return _i14.MaterialPageRoute<dynamic>(
+      return _i15.MaterialPageRoute<dynamic>(
         builder: (context) => const _i2.HomeView(),
         settings: data,
       );
     },
     _i3.StartupView: (data) {
-      return _i14.MaterialPageRoute<dynamic>(
+      return _i15.MaterialPageRoute<dynamic>(
         builder: (context) => const _i3.StartupView(),
         settings: data,
       );
     },
     _i4.SplashView: (data) {
-      return _i14.MaterialPageRoute<dynamic>(
+      return _i15.MaterialPageRoute<dynamic>(
         builder: (context) => const _i4.SplashView(),
         settings: data,
       );
     },
     _i5.OnboardingView: (data) {
-      return _i14.MaterialPageRoute<dynamic>(
+      return _i15.MaterialPageRoute<dynamic>(
         builder: (context) => const _i5.OnboardingView(),
         settings: data,
       );
     },
     _i6.CredentialsView: (data) {
-      return _i14.MaterialPageRoute<dynamic>(
+      return _i15.MaterialPageRoute<dynamic>(
         builder: (context) => const _i6.CredentialsView(),
         settings: data,
       );
     },
     _i7.SettingsView: (data) {
-      return _i14.MaterialPageRoute<dynamic>(
+      return _i15.MaterialPageRoute<dynamic>(
         builder: (context) => const _i7.SettingsView(),
         settings: data,
       );
     },
     _i8.ScanView: (data) {
-      return _i14.MaterialPageRoute<dynamic>(
+      return _i15.MaterialPageRoute<dynamic>(
         builder: (context) => const _i8.ScanView(),
         settings: data,
       );
     },
     _i9.CredentialDetailView: (data) {
       final args = data.getArgs<CredentialDetailViewArguments>(nullOk: false);
-      return _i14.MaterialPageRoute<dynamic>(
+      return _i15.MaterialPageRoute<dynamic>(
         builder: (context) => _i9.CredentialDetailView(
             key: args.key, credentialId: args.credentialId),
         settings: data,
       );
     },
     _i10.DidManagementView: (data) {
-      return _i14.MaterialPageRoute<dynamic>(
+      return _i15.MaterialPageRoute<dynamic>(
         builder: (context) => const _i10.DidManagementView(),
         settings: data,
       );
     },
     _i11.SecurityView: (data) {
-      return _i14.MaterialPageRoute<dynamic>(
+      return _i15.MaterialPageRoute<dynamic>(
         builder: (context) => const _i11.SecurityView(),
         settings: data,
       );
     },
     _i12.BackupView: (data) {
-      return _i14.MaterialPageRoute<dynamic>(
+      return _i15.MaterialPageRoute<dynamic>(
         builder: (context) => const _i12.BackupView(),
         settings: data,
       );
     },
     _i13.ActivityView: (data) {
-      return _i14.MaterialPageRoute<dynamic>(
+      return _i15.MaterialPageRoute<dynamic>(
         builder: (context) => const _i13.ActivityView(),
+        settings: data,
+      );
+    },
+    _i14.ProximityView: (data) {
+      return _i15.MaterialPageRoute<dynamic>(
+        builder: (context) => const _i14.ProximityView(),
         settings: data,
       );
     },
@@ -206,7 +220,7 @@ class CredentialDetailViewArguments {
     required this.credentialId,
   });
 
-  final _i14.Key? key;
+  final _i15.Key? key;
 
   final String credentialId;
 
@@ -227,7 +241,7 @@ class CredentialDetailViewArguments {
   }
 }
 
-extension NavigatorStateExtension on _i15.NavigationService {
+extension NavigatorStateExtension on _i16.NavigationService {
   Future<dynamic> navigateToHomeView([
     int? routerId,
     bool preventDuplicates = true,
@@ -327,7 +341,7 @@ extension NavigatorStateExtension on _i15.NavigationService {
   }
 
   Future<dynamic> navigateToCredentialDetailView({
-    _i14.Key? key,
+    _i15.Key? key,
     required String credentialId,
     int? routerId,
     bool preventDuplicates = true,
@@ -394,6 +408,20 @@ extension NavigatorStateExtension on _i15.NavigationService {
         transition,
   ]) async {
     return navigateTo<dynamic>(Routes.activityView,
+        id: routerId,
+        preventDuplicates: preventDuplicates,
+        parameters: parameters,
+        transition: transition);
+  }
+
+  Future<dynamic> navigateToProximityView([
+    int? routerId,
+    bool preventDuplicates = true,
+    Map<String, String>? parameters,
+    Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)?
+        transition,
+  ]) async {
+    return navigateTo<dynamic>(Routes.proximityView,
         id: routerId,
         preventDuplicates: preventDuplicates,
         parameters: parameters,
@@ -499,7 +527,7 @@ extension NavigatorStateExtension on _i15.NavigationService {
   }
 
   Future<dynamic> replaceWithCredentialDetailView({
-    _i14.Key? key,
+    _i15.Key? key,
     required String credentialId,
     int? routerId,
     bool preventDuplicates = true,
@@ -566,6 +594,20 @@ extension NavigatorStateExtension on _i15.NavigationService {
         transition,
   ]) async {
     return replaceWith<dynamic>(Routes.activityView,
+        id: routerId,
+        preventDuplicates: preventDuplicates,
+        parameters: parameters,
+        transition: transition);
+  }
+
+  Future<dynamic> replaceWithProximityView([
+    int? routerId,
+    bool preventDuplicates = true,
+    Map<String, String>? parameters,
+    Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)?
+        transition,
+  ]) async {
+    return replaceWith<dynamic>(Routes.proximityView,
         id: routerId,
         preventDuplicates: preventDuplicates,
         parameters: parameters,

@@ -56,5 +56,7 @@
 	<string>This app needs NFC access to exchange digital credentials</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>This app uses Face ID for secure authentication</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>This app uses Bluetooth to share credentials with nearby devices</string>
 </dict>
 </plist>

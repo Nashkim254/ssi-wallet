@@ -25,6 +25,7 @@ class HomeView extends StackedView<HomeViewModel> {
             SliverAppBar(
               expandedHeight: 120,
               floating: false,
+              centerTitle: false,
               pinned: true,
               elevation: 0,
               backgroundColor: AppColors.background,
@@ -149,9 +150,9 @@ class HomeView extends StackedView<HomeViewModel> {
                         Expanded(
                           child: _buildQuickAction(
                             context,
-                            icon: Icons.add_card_rounded,
-                            label: 'Add Credential',
-                            onTap: viewModel.navigateToScan,
+                            icon: Icons.bluetooth_rounded,
+                            label: 'Share in Person',
+                            onTap: viewModel.navigateToProximity,
                             gradient: AppColors.successGradient,
                           ),
                         ),

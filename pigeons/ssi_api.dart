@@ -247,4 +247,18 @@ abstract class SsiApi {
   /// Returns the last 1000 lines of logs for debugging
   @async
   String getDebugLogs();
+
+  /// Start BLE proximity presentation (ISO 18013-5)
+  /// Returns a QR code string containing device engagement data for the verifier to scan
+  @async
+  String startProximityPresentation();
+
+  /// Wait for a verifier to connect via BLE and send a presentation request
+  /// Blocks until the verifier connects and sends its request
+  @async
+  PresentationRequestDto? receiveProximityRequest();
+
+  /// Stop the proximity presentation session and clean up BLE resources
+  @async
+  bool stopProximityPresentation();
 }

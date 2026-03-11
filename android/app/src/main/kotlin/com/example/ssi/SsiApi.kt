@@ -313,6 +313,30 @@ data class OperationResult (
     )
   }
 }
+/**
+ * Verification result returned to the verifier app after reading a credential via BLE.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class VerificationResultDto (
+  val holderName: String,
+  val docType: String,
+  val receivedClaims: Map<String?, Any?>
+) {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): VerificationResultDto {
+      val holderName = pigeonVar_list[0] as String
+      val docType = pigeonVar_list[1] as String
+      @Suppress("UNCHECKED_CAST")
+      val receivedClaims = pigeonVar_list[2] as Map<String?, Any?>
+      return VerificationResultDto(holderName, docType, receivedClaims)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(holderName, docType, receivedClaims)
+  }
+}
+
 private open class SsiApiPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
@@ -351,6 +375,11 @@ private open class SsiApiPigeonCodec : StandardMessageCodec() {
           OperationResult.fromList(it)
         }
       }
+      136.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          VerificationResultDto.fromList(it)
+        }
+      }
       else -> super.readValueOfType(type, buffer)
     }
   }
@@ -382,6 +411,10 @@ private open class SsiApiPigeonCodec : StandardMessageCodec() {
       }
       is OperationResult -> {
         stream.write(135)
+        writeValue(stream, value.toList())
+      }
+      is VerificationResultDto -> {
+        stream.write(136)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -460,6 +493,14 @@ interface SsiApi {
   fun receiveProximityRequest(callback: (Result<PresentationRequestDto?>) -> Unit)
   /** Stop the proximity presentation session and clean up BLE resources */
   fun stopProximityPresentation(callback: (Result<Boolean>) -> Unit)
+  /** Scan for a nearby holder advertising their device-engagement beacon */
+  fun scanForNearbyHolder(callback: (Result<String?>) -> Unit)
+  /** Connect to the holder and start a BLE verifier session using the QR engagement string */
+  fun startProximityVerification(qrCode: String, callback: (Result<Boolean>) -> Unit)
+  /** Wait for and return the verification result from the holder */
+  fun receiveVerificationResult(callback: (Result<VerificationResultDto?>) -> Unit)
+  /** Stop the verifier session and clean up resources */
+  fun stopProximityVerification(callback: (Result<Boolean>) -> Unit)
 
   companion object {
     /** The codec used by SsiApi. */
@@ -957,6 +998,76 @@ interface SsiApi {
               } else {
                 val data = result.getOrNull()
                 reply.reply(wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.ssi.SsiApi.scanForNearbyHolder$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.scanForNearbyHolder { result: Result<String?> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(result.getOrNull()))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.ssi.SsiApi.startProximityVerification$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val qrCodeArg = args[0] as String
+            api.startProximityVerification(qrCodeArg) { result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(result.getOrNull()))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.ssi.SsiApi.receiveVerificationResult$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.receiveVerificationResult { result: Result<VerificationResultDto?> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(result.getOrNull()))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.ssi.SsiApi.stopProximityVerification$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.stopProximityVerification { result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(wrapError(error))
+              } else {
+                reply.reply(wrapResult(result.getOrNull()))
               }
             }
           }

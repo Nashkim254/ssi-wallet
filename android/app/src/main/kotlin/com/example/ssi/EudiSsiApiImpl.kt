@@ -54,10 +54,17 @@ class EudiSsiApiImpl(private val context: Context) : SsiApi {
     // Storage for pending presentation requests
     private val pendingPresentations = mutableMapOf<String, Any>()
 
-    // BLE proximity presentation state
+    // BLE proximity presentation state (holder side)
     private var proximityTransferListener: TransferEvent.Listener? = null
     private var proximityQrDeferred: CompletableDeferred<String>? = null
     private var proximityRequestDeferred: CompletableDeferred<ResolvedRequestObject.ProximityRequest>? = null
+    // Discovery beacon — starts when QR is ready so verifiers can auto-discover
+    private var discoveryBeacon: MdocDiscoveryBeacon? = null
+
+    // BLE verifier state
+    private var activeScanner: MdocBleScanner? = null
+    private var activeReader: MdocBleReader? = null
+    private var verificationResultDeferred: CompletableDeferred<Map<String, String>>? = null
 
     private var isInitialized = false
 
@@ -959,7 +966,11 @@ class EudiSsiApiImpl(private val context: Context) : SsiApi {
                     when (event) {
                         is TransferEvent.QrEngagementReady -> {
                             Log.d(TAG, "QR engagement ready")
-                            qrDeferred.complete(event.qrCode.content)
+                            val qrString = event.qrCode.content
+                            // Start discovery beacon so verifier can auto-detect the holder
+                            discoveryBeacon = MdocDiscoveryBeacon(context, qrString)
+                            discoveryBeacon?.start()
+                            qrDeferred.complete(qrString)
                         }
                         is TransferEvent.RequestReceived -> {
                             Log.d(TAG, "Proximity request received from verifier")
@@ -1063,6 +1074,10 @@ class EudiSsiApiImpl(private val context: Context) : SsiApi {
                     eudiWallet.stopProximityPresentation()
                 }
 
+                // Stop discovery beacon
+                discoveryBeacon?.stop()
+                discoveryBeacon = null
+
                 // Clean up state
                 proximityTransferListener = null
                 proximityQrDeferred = null
@@ -1078,6 +1093,100 @@ class EudiSsiApiImpl(private val context: Context) : SsiApi {
                 withContext(Dispatchers.Main) {
                     callback(Result.success(false))
                 }
+            }
+        }
+    }
+
+    // MARK: - BLE Proximity Verification (verifier / reader role)
+
+    override fun scanForNearbyHolder(callback: (Result<String?>) -> Unit) {
+        coroutineScope.launch {
+            try {
+                Log.d(TAG, "Scanning for nearby holder beacon...")
+                val scanner = MdocBleScanner(context)
+                activeScanner = scanner
+                val qr = scanner.scanForHolder()
+                activeScanner = null
+                Log.d(TAG, "Found holder QR (${qr.length} chars)")
+                withContext(Dispatchers.Main) { callback(Result.success(qr)) }
+            } catch (e: Exception) {
+                Log.e(TAG, "scanForNearbyHolder failed", e)
+                activeScanner = null
+                withContext(Dispatchers.Main) { callback(Result.failure(e)) }
+            }
+        }
+    }
+
+    override fun startProximityVerification(qrCode: String, callback: (Result<Boolean>) -> Unit) {
+        coroutineScope.launch {
+            try {
+                Log.d(TAG, "Starting proximity verification...")
+                val reader = MdocBleReader(context, qrCode)
+                activeReader = reader
+                val resultDeferred = CompletableDeferred<Map<String, String>>()
+                verificationResultDeferred = resultDeferred
+                // Launch reading in background — result will be collected in receiveVerificationResult
+                coroutineScope.launch {
+                    try {
+                        val claims = reader.readCredential()
+                        resultDeferred.complete(claims)
+                    } catch (e: Exception) {
+                        resultDeferred.completeExceptionally(e)
+                    }
+                }
+                withContext(Dispatchers.Main) { callback(Result.success(true)) }
+            } catch (e: Exception) {
+                Log.e(TAG, "startProximityVerification failed", e)
+                withContext(Dispatchers.Main) { callback(Result.failure(e)) }
+            }
+        }
+    }
+
+    override fun receiveVerificationResult(callback: (Result<VerificationResultDto?>) -> Unit) {
+        coroutineScope.launch {
+            try {
+                val deferred = verificationResultDeferred
+                    ?: throw Exception("No active verification session")
+                Log.d(TAG, "Waiting for verification result...")
+                val claims = deferred.await()
+                verificationResultDeferred = null
+                activeReader = null
+
+                // Build VerificationResultDto from claims
+                val firstName = claims["given_name"] ?: ""
+                val lastName  = claims["family_name"] ?: ""
+                val holderName = listOf(firstName, lastName).filter { it.isNotEmpty() }.joinToString(" ")
+
+                val dto = VerificationResultDto(
+                    holderName = holderName,
+                    docType = "org.iso.18013.5.1.mDL",
+                    receivedClaims = claims
+                )
+                Log.d(TAG, "Verification result ready: ${claims.size} claims")
+                withContext(Dispatchers.Main) { callback(Result.success(dto)) }
+            } catch (e: Exception) {
+                Log.e(TAG, "receiveVerificationResult failed", e)
+                verificationResultDeferred = null
+                activeReader = null
+                withContext(Dispatchers.Main) { callback(Result.failure(e)) }
+            }
+        }
+    }
+
+    override fun stopProximityVerification(callback: (Result<Boolean>) -> Unit) {
+        coroutineScope.launch {
+            try {
+                Log.d(TAG, "Stopping proximity verification...")
+                activeScanner?.stop()
+                activeScanner = null
+                activeReader?.stop()
+                activeReader = null
+                verificationResultDeferred?.completeExceptionally(Exception("Verification stopped"))
+                verificationResultDeferred = null
+                withContext(Dispatchers.Main) { callback(Result.success(true)) }
+            } catch (e: Exception) {
+                Log.e(TAG, "stopProximityVerification failed", e)
+                withContext(Dispatchers.Main) { callback(Result.success(false)) }
             }
         }
     }

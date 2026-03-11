@@ -156,6 +156,16 @@ class HomeView extends StackedView<HomeViewModel> {
                             gradient: AppColors.successGradient,
                           ),
                         ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildQuickAction(
+                            context,
+                            icon: Icons.verified_user_rounded,
+                            label: 'Verify',
+                            onTap: viewModel.navigateToVerifier,
+                            gradient: AppColors.accentGradient,
+                          ),
+                        ),
                       ],
                     ),
                   ],

@@ -22,6 +22,7 @@ import 'package:ssi/ui/views/security/security_view.dart';
 import 'package:ssi/ui/views/backup/backup_view.dart';
 import 'package:ssi/ui/views/activity/activity_view.dart';
 import 'package:ssi/ui/views/proximity/proximity_view.dart';
+import 'package:ssi/ui/views/verifier/verifier_view.dart';
 // @stacked-import
 
 @StackedApp(
@@ -39,6 +40,7 @@ import 'package:ssi/ui/views/proximity/proximity_view.dart';
     MaterialRoute(page: BackupView),
     MaterialRoute(page: ActivityView),
     MaterialRoute(page: ProximityView),
+    MaterialRoute(page: VerifierView),
 // @stacked-route
   ],
   dependencies: [

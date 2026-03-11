@@ -887,6 +887,8 @@ class EudiSsiApiImpl: NSObject, SsiApi {
                 }
 
                 print("[EudiSsiApiImpl] BLE proximity QR engagement generated (\(qrString.count) chars)")
+                // Start discovery beacon so nearby verifier apps can auto-discover
+                self.discoveryBeacon = MdocDiscoveryBeacon(qrString: qrString)
                 completion(.success(qrString))
             } catch {
                 print("[EudiSsiApiImpl] Failed to start proximity presentation: \(error)")
@@ -940,9 +942,87 @@ class EudiSsiApiImpl: NSObject, SsiApi {
     func stopProximityPresentation(completion: @escaping (Result<Bool, Error>) -> Void) {
         Task {
             print("[EudiSsiApiImpl] Stopping BLE proximity presentation...")
+            discoveryBeacon?.stop()
+            discoveryBeacon = nil
             proximitySession = nil
             print("[EudiSsiApiImpl] Proximity session cleaned up")
             completion(.success(true))
+        }
+    }
+
+    // MARK: - Proximity Verification (Reader/Verifier role)
+
+    private var discoveryBeacon: MdocDiscoveryBeacon?
+    private var activeReader: MdocBleReader?
+    private var activeScanner: MdocBleScanner?
+    private var verificationContinuation: CheckedContinuation<VerificationResultDto, Error>?
+
+    func startProximityVerification(qrCode: String, completion: @escaping (Result<Bool, Error>) -> Void) {
+        Task {
+            do {
+                print("[EudiSsiApiImpl] Starting BLE proximity verification for QR: \(qrCode.prefix(30))...")
+                activeReader = try MdocBleReader(qrCode: qrCode)
+                completion(.success(true))
+            } catch {
+                print("[EudiSsiApiImpl] Failed to init BLE reader: \(error)")
+                completion(.failure(error))
+            }
+        }
+    }
+
+    func receiveVerificationResult(completion: @escaping (Result<VerificationResultDto?, Error>) -> Void) {
+        Task {
+            do {
+                guard let reader = activeReader else {
+                    throw NSError(domain: "EudiSsiApiImpl", code: -1,
+                                  userInfo: [NSLocalizedDescriptionKey: "No active reader. Call startProximityVerification first."])
+                }
+                print("[EudiSsiApiImpl] Waiting for holder to respond via BLE...")
+                let claims = try await reader.readCredential()
+                activeReader = nil
+
+                let dto = VerificationResultDto(
+                    docType: "org.iso.18013.5.1.mDL",
+                    holderName: [claims["family_name"], claims["given_name"]].compactMap { $0 }.joined(separator: " "),
+                    receivedClaims: Dictionary(uniqueKeysWithValues: claims.map { ($0.key as String?, $0.value as Any?) }),
+                    verified: !claims.isEmpty,
+                    error: nil
+                )
+                print("[EudiSsiApiImpl] Verification result: \(claims.count) claims from holder")
+                completion(.success(dto))
+            } catch {
+                activeReader = nil
+                print("[EudiSsiApiImpl] Verification failed: \(error)")
+                completion(.failure(error))
+            }
+        }
+    }
+
+    func stopProximityVerification(completion: @escaping (Result<Bool, Error>) -> Void) {
+        Task {
+            print("[EudiSsiApiImpl] Stopping BLE proximity verification...")
+            activeScanner?.stop()
+            activeScanner = nil
+            activeReader = nil
+            completion(.success(true))
+        }
+    }
+
+    func scanForNearbyHolder(completion: @escaping (Result<String?, Error>) -> Void) {
+        Task {
+            do {
+                print("[EudiSsiApiImpl] Scanning for nearby mDL holder beacon...")
+                let scanner = MdocBleScanner()
+                activeScanner = scanner
+                let qr = try await scanner.scanForHolder()
+                activeScanner = nil
+                print("[EudiSsiApiImpl] Found holder QR via BLE beacon")
+                completion(.success(qr))
+            } catch {
+                activeScanner = nil
+                print("[EudiSsiApiImpl] BLE scan failed or cancelled: \(error)")
+                completion(.failure(error))
+            }
         }
     }
 

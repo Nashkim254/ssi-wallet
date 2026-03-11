@@ -340,6 +340,28 @@ struct PresentationSubmissionDto {
   }
 }
 
+/// Verification result from proximity verifier session
+struct VerificationResultDto {
+  var docType: String
+  var holderName: String
+  var receivedClaims: [String?: Any?]
+  var verified: Bool
+  var error: String? = nil
+
+  static func fromList(_ pigeonVar_list: [Any?]) -> VerificationResultDto? {
+    let docType = pigeonVar_list[0] as! String
+    let holderName = pigeonVar_list[1] as! String
+    let receivedClaims = pigeonVar_list[2] as! [String?: Any?]
+    let verified = pigeonVar_list[3] as! Bool
+    let error: String? = nilOrValue(pigeonVar_list[4])
+    return VerificationResultDto(docType: docType, holderName: holderName,
+                                 receivedClaims: receivedClaims, verified: verified, error: error)
+  }
+  func toList() -> [Any?] {
+    return [docType, holderName, receivedClaims, verified, error]
+  }
+}
+
 /// Result wrapper for operations
 ///
 /// Generated class from Pigeon that represents data sent in messages.
@@ -387,6 +409,8 @@ private class SsiApiPigeonCodecReader: FlutterStandardReader {
       return PresentationSubmissionDto.fromList(self.readValue() as! [Any?])
     case 135:
       return OperationResult.fromList(self.readValue() as! [Any?])
+    case 136:
+      return VerificationResultDto.fromList(self.readValue() as! [Any?])
     default:
       return super.readValue(ofType: type)
     }
@@ -412,6 +436,9 @@ private class SsiApiPigeonCodecWriter: FlutterStandardWriter {
       super.writeValue(value.toList())
     } else if let value = value as? PresentationSubmissionDto {
       super.writeByte(134)
+      super.writeValue(value.toList())
+    } else if let value = value as? VerificationResultDto {
+      super.writeByte(136)
       super.writeValue(value.toList())
     } else if let value = value as? OperationResult {
       super.writeByte(135)
@@ -497,6 +524,14 @@ protocol SsiApi {
   func receiveProximityRequest(completion: @escaping (Result<PresentationRequestDto?, Error>) -> Void)
   /// Stop the proximity presentation session and clean up BLE resources
   func stopProximityPresentation(completion: @escaping (Result<Bool, Error>) -> Void)
+  /// Start a BLE proximity verification session (reader/verifier role)
+  func startProximityVerification(qrCode: String, completion: @escaping (Result<Bool, Error>) -> Void)
+  /// Wait for holder to respond and return verified claims
+  func receiveVerificationResult(completion: @escaping (Result<VerificationResultDto?, Error>) -> Void)
+  /// Stop the proximity verification session
+  func stopProximityVerification(completion: @escaping (Result<Bool, Error>) -> Void)
+  /// Scan for a nearby holder advertising the discovery beacon; returns the QR string
+  func scanForNearbyHolder(completion: @escaping (Result<String?, Error>) -> Void)
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -951,6 +986,64 @@ class SsiApiSetup {
       }
     } else {
       stopProximityPresentationChannel.setMessageHandler(nil)
+    }
+    /// Start BLE proximity verification (reader role)
+    let startProximityVerificationChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.ssi.SsiApi.startProximityVerification\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      startProximityVerificationChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let qrCode = args[0] as! String
+        api.startProximityVerification(qrCode: qrCode) { result in
+          switch result {
+          case .success(let res): reply(wrapResult(res))
+          case .failure(let error): reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      startProximityVerificationChannel.setMessageHandler(nil)
+    }
+    /// Wait for verification result
+    let receiveVerificationResultChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.ssi.SsiApi.receiveVerificationResult\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      receiveVerificationResultChannel.setMessageHandler { _, reply in
+        api.receiveVerificationResult { result in
+          switch result {
+          case .success(let res): reply(wrapResult(res))
+          case .failure(let error): reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      receiveVerificationResultChannel.setMessageHandler(nil)
+    }
+    /// Stop proximity verification
+    let stopProximityVerificationChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.ssi.SsiApi.stopProximityVerification\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      stopProximityVerificationChannel.setMessageHandler { _, reply in
+        api.stopProximityVerification { result in
+          switch result {
+          case .success(let res): reply(wrapResult(res))
+          case .failure(let error): reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      stopProximityVerificationChannel.setMessageHandler(nil)
+    }
+    /// Scan for nearby holder beacon
+    let scanForNearbyHolderChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.ssi.SsiApi.scanForNearbyHolder\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      scanForNearbyHolderChannel.setMessageHandler { _, reply in
+        api.scanForNearbyHolder { result in
+          switch result {
+          case .success(let res): reply(wrapResult(res))
+          case .failure(let error): reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      scanForNearbyHolderChannel.setMessageHandler(nil)
     }
   }
 }

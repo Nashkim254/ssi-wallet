@@ -327,6 +327,44 @@ class PresentationSubmissionDto {
   }
 }
 
+/// Verification result from proximity verifier session
+class VerificationResultDto {
+  VerificationResultDto({
+    required this.docType,
+    required this.holderName,
+    required this.receivedClaims,
+    required this.verified,
+    this.error,
+  });
+
+  String docType;
+  String holderName;
+  Map<String?, Object?> receivedClaims;
+  bool verified;
+  String? error;
+
+  Object encode() {
+    return <Object?>[
+      docType,
+      holderName,
+      receivedClaims,
+      verified,
+      error,
+    ];
+  }
+
+  static VerificationResultDto decode(Object result) {
+    result as List<Object?>;
+    return VerificationResultDto(
+      docType: result[0]! as String,
+      holderName: result[1]! as String,
+      receivedClaims: (result[2] as Map<Object?, Object?>?)!.cast<String?, Object?>(),
+      verified: result[3]! as bool,
+      error: result[4] as String?,
+    );
+  }
+}
+
 /// Result wrapper for operations
 class OperationResult {
   OperationResult({
@@ -385,6 +423,9 @@ class _PigeonCodec extends StandardMessageCodec {
     }    else if (value is PresentationSubmissionDto) {
       buffer.putUint8(134);
       writeValue(buffer, value.encode());
+    }    else if (value is VerificationResultDto) {
+      buffer.putUint8(136);
+      writeValue(buffer, value.encode());
     }    else if (value is OperationResult) {
       buffer.putUint8(135);
       writeValue(buffer, value.encode());
@@ -408,8 +449,10 @@ class _PigeonCodec extends StandardMessageCodec {
         return PresentationRequestDto.decode(readValue(buffer)!);
       case 134: 
         return PresentationSubmissionDto.decode(readValue(buffer)!);
-      case 135: 
+      case 135:
         return OperationResult.decode(readValue(buffer)!);
+      case 136:
+        return VerificationResultDto.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
@@ -1101,6 +1144,109 @@ class SsiApi {
       );
     } else {
       return (pigeonVar_replyList[0] as PresentationRequestDto?);
+    }
+  }
+
+  /// Start a BLE proximity verification session as the reader/verifier.
+  /// Pass the QR code string scanned from the holder's screen.
+  Future<bool> startProximityVerification(String qrCode) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.ssi.SsiApi.startProximityVerification$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(<Object?>[qrCode]) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as bool?)!;
+    }
+  }
+
+  /// Wait for the holder to respond and return the verified claims.
+  Future<VerificationResultDto?> receiveVerificationResult() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.ssi.SsiApi.receiveVerificationResult$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(null) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return (pigeonVar_replyList[0] as VerificationResultDto?);
+    }
+  }
+
+  /// Stop the proximity verification session and clean up BLE resources.
+  Future<bool> stopProximityVerification() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.ssi.SsiApi.stopProximityVerification$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(null) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as bool?)!;
+    }
+  }
+
+  /// Scan for a nearby holder advertising the discovery beacon; returns the QR string when found
+  Future<String?> scanForNearbyHolder() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.ssi.SsiApi.scanForNearbyHolder$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_channel.send(null) as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return (pigeonVar_replyList[0] as String?);
     }
   }
 

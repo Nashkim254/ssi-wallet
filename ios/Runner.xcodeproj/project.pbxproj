@@ -14,6 +14,9 @@
 		54C58F18A7384F3F897F8307 /* SsiApi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E20863366384AF38AC46E83 /* SsiApi.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		76D12D674824438CA9749200 /* EudiSsiApiImpl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027409046FED4BAEA19FA1EE /* EudiSsiApiImpl.swift */; };
+		A2B3C4D5E6F700010001BLD1 /* MdocBleReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B3C4D5E6F700010001REF1 /* MdocBleReader.swift */; };
+		A2B3C4D5E6F700010002BLD2 /* MdocDiscoveryBeacon.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B3C4D5E6F700010002REF2 /* MdocDiscoveryBeacon.swift */; };
+		A2B3C4D5E6F700010003BLD3 /* MdocBleScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B3C4D5E6F700010003REF3 /* MdocBleScanner.swift */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
@@ -54,6 +57,9 @@
 
 /* Begin PBXFileReference section */
 		027409046FED4BAEA19FA1EE /* EudiSsiApiImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EudiSsiApiImpl.swift; sourceTree = "<group>"; };
+		A2B3C4D5E6F700010001REF1 /* MdocBleReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MdocBleReader.swift; sourceTree = "<group>"; };
+		A2B3C4D5E6F700010002REF2 /* MdocDiscoveryBeacon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MdocDiscoveryBeacon.swift; sourceTree = "<group>"; };
+		A2B3C4D5E6F700010003REF3 /* MdocBleScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MdocBleScanner.swift; sourceTree = "<group>"; };
 		0D8216C2AF1BD33E8FE7FC95 /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		141332A6C2C1184C6937D752 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
@@ -180,6 +186,9 @@
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				1E20863366384AF38AC46E83 /* SsiApi.swift */,
 				027409046FED4BAEA19FA1EE /* EudiSsiApiImpl.swift */,
+				A2B3C4D5E6F700010001REF1 /* MdocBleReader.swift */,
+				A2B3C4D5E6F700010002REF2 /* MdocDiscoveryBeacon.swift */,
+				A2B3C4D5E6F700010003REF3 /* MdocBleScanner.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -451,6 +460,9 @@
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				54C58F18A7384F3F897F8307 /* SsiApi.swift in Sources */,
 				76D12D674824438CA9749200 /* EudiSsiApiImpl.swift in Sources */,
+				A2B3C4D5E6F700010001BLD1 /* MdocBleReader.swift in Sources */,
+				A2B3C4D5E6F700010002BLD2 /* MdocDiscoveryBeacon.swift in Sources */,
+				A2B3C4D5E6F700010003BLD3 /* MdocBleScanner.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -16,6 +16,7 @@ import 'package:ssi/ui/views/did_management/did_management_view.dart' as _i10;
 import 'package:ssi/ui/views/home/home_view.dart' as _i2;
 import 'package:ssi/ui/views/onboarding/onboarding_view.dart' as _i5;
 import 'package:ssi/ui/views/proximity/proximity_view.dart' as _i14;
+import 'package:ssi/ui/views/verifier/verifier_view.dart' as _i17;
 import 'package:ssi/ui/views/scan/scan_view.dart' as _i8;
 import 'package:ssi/ui/views/security/security_view.dart' as _i11;
 import 'package:ssi/ui/views/settings/settings_view.dart' as _i7;
@@ -51,6 +52,8 @@ class Routes {
 
   static const proximityView = '/proximity-view';
 
+  static const verifierView = '/verifier-view';
+
   static const all = <String>{
     homeView,
     startupView,
@@ -65,6 +68,7 @@ class Routes {
     backupView,
     activityView,
     proximityView,
+    verifierView,
   };
 }
 
@@ -121,6 +125,10 @@ class StackedRouter extends _i1.RouterBase {
     _i1.RouteDef(
       Routes.proximityView,
       page: _i14.ProximityView,
+    ),
+    _i1.RouteDef(
+      Routes.verifierView,
+      page: _i17.VerifierView,
     ),
   ];
 
@@ -202,6 +210,12 @@ class StackedRouter extends _i1.RouterBase {
     _i14.ProximityView: (data) {
       return _i15.MaterialPageRoute<dynamic>(
         builder: (context) => const _i14.ProximityView(),
+        settings: data,
+      );
+    },
+    _i17.VerifierView: (data) {
+      return _i15.MaterialPageRoute<dynamic>(
+        builder: (context) => const _i17.VerifierView(),
         settings: data,
       );
     },
@@ -608,6 +622,34 @@ extension NavigatorStateExtension on _i16.NavigationService {
         transition,
   ]) async {
     return replaceWith<dynamic>(Routes.proximityView,
+        id: routerId,
+        preventDuplicates: preventDuplicates,
+        parameters: parameters,
+        transition: transition);
+  }
+
+  Future<dynamic> navigateToVerifierView([
+    int? routerId,
+    bool preventDuplicates = true,
+    Map<String, String>? parameters,
+    Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)?
+        transition,
+  ]) async {
+    return navigateTo<dynamic>(Routes.verifierView,
+        id: routerId,
+        preventDuplicates: preventDuplicates,
+        parameters: parameters,
+        transition: transition);
+  }
+
+  Future<dynamic> replaceWithVerifierView([
+    int? routerId,
+    bool preventDuplicates = true,
+    Map<String, String>? parameters,
+    Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)?
+        transition,
+  ]) async {
+    return replaceWith<dynamic>(Routes.verifierView,
         id: routerId,
         preventDuplicates: preventDuplicates,
         parameters: parameters,
